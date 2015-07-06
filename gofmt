@@ -1,0 +1,8 @@
+#!/bin/bash
+
+files=`find . -type f -name "*.go" |xargs`
+for file in $files; do
+    gofmt -s -w ${file}
+done
+
+
