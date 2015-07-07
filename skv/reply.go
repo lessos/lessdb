@@ -141,7 +141,7 @@ func (r *Reply) Hash() []Entry {
 	return hs
 }
 
-func (r *Reply) JsonExport(v interface{}) error {
+func (r *Reply) JsonDecode(v interface{}) error {
 	return jsonDecode(r.Bytes(), v)
 }
 
@@ -158,6 +158,6 @@ func (e *Entry) Uint64() uint64 {
 	return 0
 }
 
-func (e *Entry) JsonExport(v interface{}) error {
+func (e *Entry) JsonDecode(v interface{}) error {
 	return jsonDecode(e.Value, v)
 }

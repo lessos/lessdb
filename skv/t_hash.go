@@ -48,10 +48,6 @@ func (db *DB) Hget(key, field []byte) *Reply {
 
 func (db *DB) Hscan(key, cursor, end []byte, limit uint64) *Reply {
 
-	if len(end) < 1 {
-		end = cursor
-	}
-
 	if limit < scan_max_limit {
 		limit = scan_max_limit
 	}
@@ -63,6 +59,10 @@ func (db *DB) Hscan(key, cursor, end []byte, limit uint64) *Reply {
 		cend   = append(prefix, end...)
 		rpl    = NewReply("")
 	)
+
+	for i := len(cend); i < 256; i++ {
+		cend = append(cend, 0xff)
+	}
 
 	iter := db.ldb.NewIterator(&util.Range{Start: cstart, Limit: append(cend)}, nil)
 

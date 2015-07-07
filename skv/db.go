@@ -27,20 +27,23 @@ type DB struct {
 }
 
 type Config struct {
+	DataDir string `json:"datadir,omitempty"`
 }
 
 var (
-	DefaultConfig = Config{}
+	DefaultConfig = Config{
+		DataDir: "./var",
+	}
 )
 
-func Open(datadir string, cfg Config) (*DB, error) {
+func Open(cfg Config) (*DB, error) {
 
 	var (
 		db  = &DB{}
 		err error
 	)
 
-	db.ldb, err = leveldb.OpenFile(datadir, &opt.Options{
+	db.ldb, err = leveldb.OpenFile(cfg.DataDir+"/0.0", &opt.Options{
 		WriteL0SlowdownTrigger: 16,
 		WriteL0PauseTrigger:    64,
 		CompactionTableSize:    16 * opt.MiB,

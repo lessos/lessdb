@@ -111,7 +111,7 @@ func (db *DB) IschemaSet(key []byte, schema IsetSchema) *Reply {
 	}
 
 	if rs := db._raw_get(_iset_schema_key(key)); rs.Status == "OK" {
-		rs.JsonExport(&prev)
+		rs.JsonDecode(&prev)
 	}
 
 	for i, ei := range schema.Indexes {
@@ -245,7 +245,7 @@ func (db *DB) IschemaSet(key []byte, schema IsetSchema) *Reply {
 				for _, entry := range rs {
 
 					var obj map[string]interface{}
-					if err := entry.JsonExport(&obj); err == nil {
+					if err := entry.JsonDecode(&obj); err == nil {
 
 						for mk, mv := range obj {
 

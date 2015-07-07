@@ -34,7 +34,7 @@ func (db *DB) Setex(key, value []byte, ttl uint64) *Reply {
 	return db._raw_setex(_set_key(key), value, ttl)
 }
 
-func (db *DB) Incr(key []byte, step int64) *Reply {
+func (db *DB) Incrby(key []byte, step int64) *Reply {
 	return db._raw_incr(_set_key(key), step)
 }
 

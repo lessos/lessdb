@@ -295,7 +295,7 @@ func (db *DB) Iset(key, prikey []byte, obj interface{}) *Reply {
 
 	if rs := db._raw_get(bkey); rs.Status == ReplyOK {
 
-		if err := rs.JsonExport(&prev); err == nil {
+		if err := rs.JsonDecode(&prev); err == nil {
 			previdx = _iset_idx_data_export(key, prev)
 		}
 
@@ -443,7 +443,7 @@ func (db *DB) Idel(key, prikey []byte) *Reply {
 
 		var prev map[string]interface{}
 
-		if err := rs.JsonExport(&prev); err == nil {
+		if err := rs.JsonDecode(&prev); err == nil {
 			previdx = _iset_idx_data_export(key, prev)
 		}
 	}
