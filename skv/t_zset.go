@@ -82,6 +82,10 @@ func (db *DB) Zrange(key []byte, score_start, score_end, limit uint64) *Reply {
 		rpl      = NewReply("")
 	)
 
+	for i := len(bs_end); i < 256; i++ {
+		bs_end = append(bs_end, 0xff)
+	}
+
 	iter := db.ldb.NewIterator(&util.Range{Start: bs_start, Limit: bs_end}, nil)
 
 	for iter.Next() {
