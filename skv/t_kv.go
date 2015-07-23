@@ -50,3 +50,7 @@ func (db *DB) Del(keys ...[]byte) *Reply {
 
 	return db._raw_del(keys...)
 }
+
+func (db *DB) Ttl(key []byte) *Reply {
+	return db._raw_ttl(_set_key(key))
+}

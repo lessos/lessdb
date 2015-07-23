@@ -22,7 +22,7 @@ import (
 )
 
 func timeNowMS() uint64 {
-	return uint64(time.Now().UnixNano() / 1e6)
+	return uint64(time.Now().UTC().UnixNano() / 1e6)
 }
 
 func bytesClone(src []byte) []byte {

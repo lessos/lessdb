@@ -153,6 +153,20 @@ func (db *DB) _raw_setex(key, value []byte, ttl uint64) *Reply {
 	return db._raw_set(key, value)
 }
 
+func (db *DB) _raw_ttl(key []byte) *Reply {
+
+	ttl := db.Zget(ns_set_ttl, key).Int64() - int64(timeNowMS())
+	if ttl < 0 {
+		ttl = -1
+	}
+
+	rpl := NewReply("")
+
+	rpl.Data = append(rpl.Data, []byte(strconv.FormatInt(ttl, 10)))
+
+	return rpl
+}
+
 func (db *DB) _raw_incr(key []byte, step int64) *Reply {
 
 	num := uint64(0)
