@@ -32,12 +32,14 @@ func (db *DB) ttl_worker() {
 
 				batch := new(leveldb.Batch)
 
-				batch.Delete(v.Key)
-				batch.Delete(_zset_key(ns_set_ttl, v.Key))
 				batch.Delete(_zscore_key(ns_set_ttl, v.Key, v.Uint64()))
 
-				db.ldb.Write(batch, nil)
+				if rs := db.Zget(ns_set_ttl, v.Key).Uint64(); rs == v.Uint64() {
+					batch.Delete(_zset_key(ns_set_ttl, v.Key))
+					batch.Delete(v.Key)
+				}
 
+				db.ldb.Write(batch, nil)
 				db._raw_incr(_zlen_key(ns_set_ttl), -1)
 			}
 
