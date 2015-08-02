@@ -38,7 +38,7 @@ func (db *DB) Iget(key, prikey []byte) *Reply {
 
 func (db *DB) Iscan(key, cursor, end []byte, limit uint64) *Reply {
 
-	if limit < scan_max_limit {
+	if limit > scan_max_limit {
 		limit = scan_max_limit
 	}
 

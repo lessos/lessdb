@@ -48,7 +48,7 @@ func (db *DB) _raw_scan(cursor, end []byte, limit uint64) *Reply {
 		end = append(end, 0xff)
 	}
 
-	if limit < scan_max_limit {
+	if limit > scan_max_limit {
 		limit = scan_max_limit
 	}
 

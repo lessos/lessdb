@@ -48,7 +48,7 @@ func (db *DB) Hget(key, field []byte) *Reply {
 
 func (db *DB) Hscan(key, cursor, end []byte, limit uint64) *Reply {
 
-	if limit < scan_max_limit {
+	if limit > scan_max_limit {
 		limit = scan_max_limit
 	}
 
