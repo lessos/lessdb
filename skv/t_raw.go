@@ -139,6 +139,25 @@ func (db *DB) _raw_set(key, value []byte) *Reply {
 	return rpl
 }
 
+func (db *DB) _raw_setex_json(key []byte, value interface{}, ttl uint64) *Reply {
+
+	bvalue, err := jsonEncode(value)
+	if err != nil {
+		return NewReply(err.Error())
+	}
+
+	if ttl < 100 {
+		return NewReply("")
+	}
+
+	rpl := db.Zset(ns_set_ttl, key, timeNowMS()+ttl)
+	if rpl.Status != ReplyOK {
+		return rpl
+	}
+
+	return db._raw_set(key, bvalue)
+}
+
 func (db *DB) _raw_setex(key, value []byte, ttl uint64) *Reply {
 
 	if ttl < 100 {

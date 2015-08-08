@@ -19,7 +19,16 @@ func _set_key(key []byte) []byte {
 }
 
 func (db *DB) Scan(cursor, end []byte, limit uint64) *Reply {
-	return db._raw_scan(_set_key(cursor), _set_key(end), limit)
+
+	rpl := db._raw_scan(_set_key(cursor), _set_key(end), limit)
+
+	if len(rpl.Data) > 0 && len(rpl.Data)%2 == 0 {
+		for i := 0; i < len(rpl.Data); i += 2 {
+			rpl.Data[i] = rpl.Data[i][1:]
+		}
+	}
+
+	return rpl
 }
 
 func (db *DB) SetJson(key []byte, value interface{}) *Reply {
@@ -28,6 +37,10 @@ func (db *DB) SetJson(key []byte, value interface{}) *Reply {
 
 func (db *DB) Set(key, value []byte) *Reply {
 	return db._raw_set(_set_key(key), value)
+}
+
+func (db *DB) SetexJson(key []byte, value interface{}, ttl uint64) *Reply {
+	return db._raw_setex_json(_set_key(key), value, ttl)
 }
 
 func (db *DB) Setex(key, value []byte, ttl uint64) *Reply {
