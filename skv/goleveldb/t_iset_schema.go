@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package skv
+package goleveldb
 
 import (
 	"reflect"
 
+	"github.com/lessos/lessdb/skv"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
@@ -95,18 +96,18 @@ func (is *IsetSchema) IndexEntryAdd(ie IsetEntry) {
 	is.Indexes = append(is.Indexes, ie)
 }
 
-func (db *DB) IschemaSet(key []byte, schema IsetSchema) *Reply {
+func (db *DB) IschemaSet(key []byte, schema IsetSchema) *skv.Reply {
 
 	_iset_global_locker.Lock()
 	defer _iset_global_locker.Unlock()
 
 	var (
-		rpl  = NewReply("")
+		rpl  = skv.NewReply("")
 		prev IsetSchema
 	)
 
 	if len(schema.Indexes) > _iset_schema_max_index {
-		rpl.Status = ReplyInvalidArgument
+		rpl.Status = skv.ReplyInvalidArgument
 		return rpl
 	}
 
@@ -277,7 +278,7 @@ func (db *DB) IschemaSet(key []byte, schema IsetSchema) *Reply {
 
 	skey := string(key)
 
-	rpl = db._raw_set_json(_iset_schema_key(key), schema)
+	rpl = db._raw_set_json(_iset_schema_key(key), schema, 0)
 	if rpl.Status == "OK" {
 		_iset_indexes[skey] = schema
 	}

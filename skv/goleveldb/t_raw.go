@@ -12,13 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package skv
+package goleveldb
 
 import (
 	"strconv"
+	"sync"
 
+	"github.com/lessos/lessdb/skv"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
+)
+
+var (
+	_raw_incr_locker sync.Mutex
 )
 
 func _raw_key_encode(ns byte, key []byte) []byte {
@@ -32,13 +38,13 @@ func _raw_key_encode(ns byte, key []byte) []byte {
 	return append([]byte{ns, uint8(si)}, key...)
 }
 
-func (db *DB) RawScan(cursor, end []byte, limit uint64) *Reply {
+func (db *DB) RawScan(cursor, end []byte, limit uint64) *skv.Reply {
 	return db._raw_scan(cursor, end, limit)
 }
 
-func (db *DB) _raw_scan(cursor, end []byte, limit uint64) *Reply {
+func (db *DB) _raw_scan(cursor, end []byte, limit uint64) *skv.Reply {
 
-	rpl := NewReply("")
+	rpl := skv.NewReply("")
 
 	if len(end) < 1 {
 		end = cursor
@@ -75,9 +81,9 @@ func (db *DB) _raw_scan(cursor, end []byte, limit uint64) *Reply {
 	return rpl
 }
 
-func (db *DB) _raw_revscan(cursor, end []byte, limit uint64) *Reply {
+func (db *DB) _raw_revscan(cursor, end []byte, limit uint64) *skv.Reply {
 
-	rpl := NewReply("")
+	rpl := skv.NewReply("")
 
 	if len(cursor) < 1 {
 		cursor = end
@@ -118,19 +124,31 @@ func (db *DB) _raw_revscan(cursor, end []byte, limit uint64) *Reply {
 	return rpl
 }
 
-func (db *DB) _raw_set_json(key []byte, value interface{}) *Reply {
+func (db *DB) _raw_set_json(key []byte, value interface{}, ttl uint64) *skv.Reply {
 
 	bvalue, err := jsonEncode(value)
 	if err != nil {
-		return NewReply(err.Error())
+		return skv.NewReply(err.Error())
 	}
 
-	return db._raw_set(key, bvalue)
+	return db._raw_set(key, bvalue, ttl)
 }
 
-func (db *DB) _raw_set(key, value []byte) *Reply {
+func (db *DB) _raw_set(key, value []byte, ttl uint64) *skv.Reply {
 
-	rpl := NewReply("")
+	rpl := skv.NewReply("")
+
+	if ttl > 0 {
+
+		if ttl < 300 {
+			return rpl
+		}
+
+		rpl = db.Zset(ns_set_ttl, key, timeNowMS()+ttl)
+		if rpl.Status != skv.ReplyOK {
+			return rpl
+		}
+	}
 
 	if err := db.ldb.Put(key, value, nil); err != nil {
 		rpl.Status = err.Error()
@@ -139,58 +157,28 @@ func (db *DB) _raw_set(key, value []byte) *Reply {
 	return rpl
 }
 
-func (db *DB) _raw_setex_json(key []byte, value interface{}, ttl uint64) *Reply {
-
-	bvalue, err := jsonEncode(value)
-	if err != nil {
-		return NewReply(err.Error())
-	}
-
-	if ttl < 100 {
-		return NewReply("")
-	}
-
-	rpl := db.Zset(ns_set_ttl, key, timeNowMS()+ttl)
-	if rpl.Status != ReplyOK {
-		return rpl
-	}
-
-	return db._raw_set(key, bvalue)
-}
-
-func (db *DB) _raw_setex(key, value []byte, ttl uint64) *Reply {
-
-	if ttl < 100 {
-		return NewReply("")
-	}
-
-	rpl := db.Zset(ns_set_ttl, key, timeNowMS()+ttl)
-	if rpl.Status != ReplyOK {
-		return rpl
-	}
-
-	return db._raw_set(key, value)
-}
-
-func (db *DB) _raw_ttl(key []byte) *Reply {
+func (db *DB) _raw_ttl(key []byte) *skv.Reply {
 
 	ttl := db.Zget(ns_set_ttl, key).Int64() - int64(timeNowMS())
 	if ttl < 0 {
 		ttl = -1
 	}
 
-	rpl := NewReply("")
+	rpl := skv.NewReply("")
 
 	rpl.Data = append(rpl.Data, []byte(strconv.FormatInt(ttl, 10)))
 
 	return rpl
 }
 
-func (db *DB) _raw_incr(key []byte, step int64) *Reply {
+func (db *DB) _raw_incrby(key []byte, step int64) *skv.Reply {
+
+	_raw_incr_locker.Lock()
+	defer _raw_incr_locker.Unlock()
 
 	num := uint64(0)
 
-	if rs := db._raw_get(key); rs.Status == ReplyOK {
+	if rs := db._raw_get(key); rs.Status == skv.ReplyOK {
 		num = rs.Uint64()
 	}
 
@@ -207,22 +195,22 @@ func (db *DB) _raw_incr(key []byte, step int64) *Reply {
 	}
 
 	bnum := []byte(strconv.FormatUint(num, 10))
-	rpl := db._raw_set(key, bnum)
-	if rpl.Status == ReplyOK {
+	rpl := db._raw_set(key, bnum, 0)
+	if rpl.Status == skv.ReplyOK {
 		rpl.Data = append(rpl.Data, bnum)
 	}
 
 	return rpl
 }
 
-func (db *DB) _raw_get(key []byte) *Reply {
+func (db *DB) _raw_get(key []byte) *skv.Reply {
 
-	rpl := NewReply("")
+	rpl := skv.NewReply("")
 
 	if data, err := db.ldb.Get(key, nil); err != nil {
 
 		if err.Error() == "leveldb: not found" {
-			rpl.Status = ReplyNotFound
+			rpl.Status = skv.ReplyNotFound
 		} else {
 			rpl.Status = err.Error()
 		}
@@ -234,9 +222,9 @@ func (db *DB) _raw_get(key []byte) *Reply {
 	return rpl
 }
 
-func (db *DB) _raw_del(keys ...[]byte) *Reply {
+func (db *DB) _raw_del(keys ...[]byte) *skv.Reply {
 
-	rpl := NewReply("")
+	rpl := skv.NewReply("")
 
 	batch := new(leveldb.Batch)
 

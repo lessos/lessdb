@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package skv
+package leveldb
 
 import (
 	"bytes"
@@ -21,8 +21,8 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/util"
+	"github.com/jmhodges/levigo"
+	"github.com/lessos/lessdb/skv"
 )
 
 var (
@@ -32,11 +32,11 @@ var (
 
 type empty struct{}
 
-func (db *DB) Iget(key, prikey []byte) *Reply {
+func (db *DB) Iget(key, prikey []byte) *skv.Reply {
 	return db._raw_get(_iset_entry_key(key, prikey))
 }
 
-func (db *DB) Iscan(key, cursor, end []byte, limit uint64) *Reply {
+func (db *DB) Iscan(key, cursor, end []byte, limit uint64) *skv.Reply {
 
 	if limit > scan_max_limit {
 		limit = scan_max_limit
@@ -47,35 +47,43 @@ func (db *DB) Iscan(key, cursor, end []byte, limit uint64) *Reply {
 		prelen = len(prefix)
 		cstart = append(prefix, cursor...)
 		cend   = append(prefix, end...)
-		rpl    = NewReply("")
+		rpl    = skv.NewReply("")
 	)
 
 	for i := len(cend); i < 256; i++ {
 		cend = append(cend, 0xff)
 	}
 
-	iter := db.ldb.NewIterator(&util.Range{Start: cstart, Limit: cend}, nil)
+	ro := levigo.NewReadOptions()
+	ro.SetFillCache(false)
+	defer ro.Close()
 
-	for iter.Next() {
+	// it := db.ldb.NewIterator(&util.Range{Start: cstart, Limit: append(cend)}, nil)
+	it := db.ldb.NewIterator(ro)
+	defer it.Close()
+
+	for it.Seek(cstart); it.Valid(); it.Next() {
 
 		if limit < 1 {
 			break
 		}
 
-		if len(iter.Key()) < prelen {
+		if len(it.Key()) < prelen {
 			continue
 		}
 
-		rpl.Data = append(rpl.Data, bytesClone(iter.Key()[prelen:]))
-		rpl.Data = append(rpl.Data, bytesClone(iter.Value()))
+		if bytes.Compare(it.Key(), cend) > 0 {
+			break
+		}
+
+		rpl.Data = append(rpl.Data, bytesClone(it.Key()[prelen:]))
+		rpl.Data = append(rpl.Data, bytesClone(it.Value()))
 
 		limit--
 	}
 
-	iter.Release()
-
-	if iter.Error() != nil {
-		rpl.Status = iter.Error().Error()
+	if err := it.GetError(); err != nil {
+		rpl.Status = err.Error()
 	}
 
 	return rpl
@@ -84,9 +92,9 @@ func (db *DB) Iscan(key, cursor, end []byte, limit uint64) *Reply {
 // TODO btree
 // 	https://github.com/petar/GoLLRB
 //  https://github.com/google/btree
-func (db *DB) Iquery(key []byte, qry *QuerySet) *Reply {
+func (db *DB) Iquery(key []byte, qry *QuerySet) *skv.Reply {
 
-	rpl := NewReply(ReplyInvalidArgument)
+	rpl := skv.NewReply(skv.ReplyInvalidArgument)
 	skey := string(key)
 
 	schema, ok := _iset_indexes[skey]
@@ -121,7 +129,7 @@ func (db *DB) Iquery(key []byte, qry *QuerySet) *Reply {
 
 		start, end := _iset_idx_field_prefix(key, idx.Seq), _iset_idx_field_prefix(key, idx.Seq)
 
-		rs := []Entry{}
+		rs := []skv.Entry{}
 
 		for {
 
@@ -264,22 +272,22 @@ func (db *DB) Iquery(key []byte, qry *QuerySet) *Reply {
 		}
 	}
 
-	rpl.Status = ReplyOK
+	rpl.Status = skv.ReplyOK
 
 	return rpl
 }
 
-func (db *DB) Iset(key, prikey []byte, obj interface{}) *Reply {
+func (db *DB) Iset(key, prikey []byte, obj interface{}) *skv.Reply {
 
 	_iset_global_locker.Lock()
 	_iset_global_locker.Unlock()
 
-	rpl := NewReply("")
+	rpl := skv.NewReply("")
 
 	if len(key) > _iset_keylen_max ||
 		len(prikey) > _iset_prilen_max ||
 		obj == nil {
-		rpl.Status = ReplyInvalidArgument
+		rpl.Status = skv.ReplyInvalidArgument
 		return rpl
 	}
 
@@ -293,13 +301,13 @@ func (db *DB) Iset(key, prikey []byte, obj interface{}) *Reply {
 		len_incr = false
 	)
 
-	if rs := db._raw_get(bkey); rs.Status == ReplyOK {
+	if rs := db._raw_get(bkey); rs.Status == skv.ReplyOK {
 
 		if err := rs.JsonDecode(&prev); err == nil {
 			previdx = _iset_idx_data_export(key, prev)
 		}
 
-	} else if rs.Status == ReplyNotFound {
+	} else if rs.Status == skv.ReplyNotFound {
 		len_incr = true
 	}
 
@@ -322,7 +330,7 @@ func (db *DB) Iset(key, prikey []byte, obj interface{}) *Reply {
 
 	} else {
 
-		rpl.Status = ReplyInvalidArgument
+		rpl.Status = skv.ReplyInvalidArgument
 		return rpl
 	}
 
@@ -365,7 +373,7 @@ func (db *DB) Iset(key, prikey []byte, obj interface{}) *Reply {
 
 			if incr_set == 0 {
 
-				incr_set = db._raw_incr(_iset_idx_increment_key(key, siEntry.Seq), 1).Uint64()
+				incr_set = db._raw_incrby(_iset_idx_increment_key(key, siEntry.Seq), 1).Uint64()
 
 				ibs := make([]byte, 8)
 				binary.BigEndian.PutUint64(ibs, incr_set)
@@ -377,7 +385,7 @@ func (db *DB) Iset(key, prikey []byte, obj interface{}) *Reply {
 			} else if incr_set > 0 && incr_set > incr_prev {
 
 				if db._raw_get(_iset_idx_increment_key(key, siEntry.Seq)).Uint64() < incr_set {
-					db._raw_set(_iset_idx_increment_key(key, siEntry.Seq), []byte(strconv.FormatUint(incr_set, 10)))
+					db._raw_set(_iset_idx_increment_key(key, siEntry.Seq), []byte(strconv.FormatUint(incr_set, 10)), 0)
 				}
 			}
 		}
@@ -387,7 +395,7 @@ func (db *DB) Iset(key, prikey []byte, obj interface{}) *Reply {
 			objIdxKeyPrefix := append(_iset_idx_field_prefix(key, siKey), siEntry.Data...)
 
 			if rs := db._raw_scan(objIdxKeyPrefix, []byte{}, 1).Hash(); len(rs) > 0 {
-				rpl.Status = ReplyInvalidArgument
+				rpl.Status = skv.ReplyInvalidArgument
 				return rpl
 			}
 		}
@@ -396,50 +404,54 @@ func (db *DB) Iset(key, prikey []byte, obj interface{}) *Reply {
 	}
 
 	//
-	batch := new(leveldb.Batch)
+	wb := levigo.NewWriteBatch()
+	defer wb.Close()
+
+	wo := levigo.NewWriteOptions()
+	defer wo.Close()
 
 	for _, idxkey := range idxdup {
-		batch.Delete(idxkey)
+		wb.Delete(idxkey)
 	}
 
 	for _, idxkey := range idxnew {
-		batch.Put(idxkey, []byte{})
+		wb.Put(idxkey, []byte{})
 	}
 
 	bvalue, _ := jsonEncode(set)
-	batch.Put(bkey, bvalue)
+	wb.Put(bkey, bvalue)
 
-	if err := db.ldb.Write(batch, nil); err != nil {
+	if err := db.ldb.Write(wo, wb); err != nil {
 		rpl.Status = err.Error()
 	} else if len_incr {
-		db._raw_incr(_iset_len_key(key), 1)
+		db._raw_incrby(_iset_len_key(key), 1)
 	}
 
 	return rpl
 }
 
-func (db *DB) Idel(key, prikey []byte) *Reply {
+func (db *DB) Idel(key, prikey []byte) *skv.Reply {
 
 	_iset_global_locker.Lock()
 	_iset_global_locker.Unlock()
 
 	var (
-		rpl     = NewReply("")
+		rpl     = skv.NewReply("")
 		bkey    = _iset_entry_key(key, prikey)
 		previdx = map[uint8]IsetEntryBytes{}
 	)
 
-	if rs := db._raw_get(bkey); rs.Status == ReplyNotFound {
+	if rs := db._raw_get(bkey); rs.Status == skv.ReplyNotFound {
 
 		return rpl
 
-	} else if rs.Status != ReplyOK {
+	} else if rs.Status != skv.ReplyOK {
 
 		return rs
 
 	} else {
 
-		db._raw_incr(_iset_len_key(key), -1)
+		db._raw_incrby(_iset_len_key(key), -1)
 
 		var prev map[string]interface{}
 
@@ -448,21 +460,25 @@ func (db *DB) Idel(key, prikey []byte) *Reply {
 		}
 	}
 
-	batch := new(leveldb.Batch)
+	wb := levigo.NewWriteBatch()
+	defer wb.Close()
+
+	wo := levigo.NewWriteOptions()
+	defer wo.Close()
 
 	for piKey, piEntry := range previdx {
-		batch.Delete(append(append(_iset_idx_field_prefix(key, piKey), piEntry.Data...), prikey...))
+		wb.Delete(append(append(_iset_idx_field_prefix(key, piKey), piEntry.Data...), prikey...))
 	}
 
-	batch.Delete(bkey)
+	wb.Delete(bkey)
 
-	if err := db.ldb.Write(batch, nil); err != nil {
+	if err := db.ldb.Write(wo, wb); err != nil {
 		rpl.Status = err.Error()
 	}
 
 	return rpl
 }
 
-func (db *DB) Ilen(key []byte) *Reply {
+func (db *DB) Ilen(key []byte) *skv.Reply {
 	return db._raw_get(_iset_len_key(key))
 }

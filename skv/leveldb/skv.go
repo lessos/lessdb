@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package skv
+package leveldb
 
 const (
-	ttl_job_sleep            = 200e6
+	ttl_job_sleep            = 500e6
 	ttl_job_limit     uint64 = 10000
 	scan_max_limit    uint64 = 10000
 	ns_zero                  = 0x00

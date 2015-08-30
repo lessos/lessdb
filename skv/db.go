@@ -14,57 +14,34 @@
 
 package skv
 
-import (
-	"fmt"
+type DB interface {
+	// Raw
+	// RawScan(cursor, end []byte, limit uint64) *Reply
 
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/filter"
-	"github.com/syndtr/goleveldb/leveldb/opt"
-)
+	// General Key Value APIs
+	Get(key []byte) *Reply
+	Set(key, value []byte, ttl uint64) *Reply
+	SetJson(key []byte, value interface{}, ttl uint64) *Reply
+	Del(keys ...[]byte) *Reply
+	Scan(cursor, end []byte, limit uint64) *Reply
+	Incrby(key []byte, step int64) *Reply
+	Ttl(key []byte) *Reply
 
-type DB struct {
-	ldb *leveldb.DB
-}
+	// Hash Key Value APIs
+	Hget(key, field []byte) *Reply
+	Hset(key, field, value []byte, ttl uint64) *Reply
+	HsetJson(key, field []byte, value interface{}, ttl uint64) *Reply
+	Hdel(key, field []byte) *Reply
+	Hscan(key, cursor, end []byte, limit uint64) *Reply
+	Hlen(key []byte) *Reply
 
-type Config struct {
-	DataDir string `json:"datadir,omitempty"`
-}
+	// Sorted Key Value APIs
+	Zget(key, member []byte) *Reply
+	Zset(key, member []byte, score uint64) *Reply
+	Zdel(key, member []byte) *Reply
+	Zrange(key []byte, score_start, score_end, limit uint64) *Reply
+	Zlen(key []byte) *Reply
 
-var (
-	DefaultConfig = Config{
-		DataDir: "./var",
-	}
-)
-
-func Open(cfg Config) (*DB, error) {
-
-	var (
-		db  = &DB{}
-		err error
-	)
-
-	db.ldb, err = leveldb.OpenFile(cfg.DataDir+"/0.0", &opt.Options{
-		WriteL0SlowdownTrigger: 16,
-		WriteL0PauseTrigger:    64,
-		CompactionTableSize:    16 * opt.MiB,
-		// CompactionGPOverlapsFactor: 20,
-		// CompactionTotalSize: 5 * 32 * opt.MiB,
-		OpenFilesCacheCapacity: 1024,
-		Compression:            opt.SnappyCompression,
-		Filter:                 filter.NewBloomFilter(10),
-		BlockCacheCapacity:     64 * opt.MiB,
-		BlockSize:              1 * opt.MiB,
-		WriteBuffer:            16 * opt.MiB,
-	})
-
-	if err == nil {
-		db.ttl_worker()
-		fmt.Println("lessdb/skv.DB opened")
-	}
-
-	return db, err
-}
-
-func (db *DB) Close() {
-	db.ldb.Close()
+	// Client APIs
+	Close()
 }

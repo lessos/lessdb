@@ -27,7 +27,6 @@ const (
 type Reply struct {
 	Status string
 	Data   [][]byte
-	// Offset []byte
 }
 
 type Entry struct {

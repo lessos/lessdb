@@ -12,40 +12,43 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package skv
+package leveldb
 
 import (
-	"time"
+	"fmt"
 
-	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/jmhodges/levigo"
+	"github.com/lessos/lessdb/skv"
 )
 
-func (db *DB) ttl_worker() {
+type DB struct {
+	ldb *levigo.DB
+}
 
-	go func() {
+func Open(cfg skv.Config) (*DB, error) {
 
-		for {
+	var (
+		db  = &DB{}
+		err error
+	)
 
-			ls := db.Zrange(ns_set_ttl, 0, timeNowMS(), ttl_job_limit).Hash()
+	opts := levigo.NewOptions()
+	opts.SetCreateIfMissing(true)
+	opts.SetCache(levigo.NewLRUCache(3 << 30))
+	opts.SetFilterPolicy(levigo.NewBloomFilter(10))
+	opts.SetCompression(levigo.SnappyCompression)
+	opts.SetMaxOpenFiles(500)
 
-			for _, v := range ls {
+	db.ldb, err = levigo.Open(cfg.DataDir+"/0.0", opts)
 
-				batch := new(leveldb.Batch)
+	if err == nil {
+		db.ttl_worker()
+		fmt.Println("lessdb/skv.DB opened")
+	}
 
-				batch.Delete(_zscore_key(ns_set_ttl, v.Key, v.Uint64()))
+	return db, err
+}
 
-				if rs := db.Zget(ns_set_ttl, v.Key).Uint64(); rs == v.Uint64() {
-					batch.Delete(_zset_key(ns_set_ttl, v.Key))
-					batch.Delete(v.Key)
-				}
-
-				db.ldb.Write(batch, nil)
-				db._raw_incr(_zlen_key(ns_set_ttl), -1)
-			}
-
-			if uint64(len(ls)) < ttl_job_limit {
-				time.Sleep(ttl_job_sleep)
-			}
-		}
-	}()
+func (db *DB) Close() {
+	db.ldb.Close()
 }

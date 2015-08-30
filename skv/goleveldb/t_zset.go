@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package skv
+package goleveldb
 
 import (
 	"encoding/binary"
 	"strconv"
 
+	"github.com/lessos/lessdb/skv"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
@@ -42,21 +43,21 @@ func _zlen_key(key []byte) []byte {
 	return _raw_key_encode(ns_zset_length, key)
 }
 
-func (db *DB) Zget(key, member []byte) *Reply {
+func (db *DB) Zget(key, member []byte) *skv.Reply {
 	return db._raw_get(_zset_key(key, member))
 }
 
-func (db *DB) Zset(key, member []byte, score uint64) *Reply {
+func (db *DB) Zset(key, member []byte, score uint64) *skv.Reply {
 
 	batch := new(leveldb.Batch)
 
 	//
-	if prev := db.Zget(key, member); prev.Status == ReplyOK && prev.Uint64() != score {
+	if prev := db.Zget(key, member); prev.Status == skv.ReplyOK && prev.Uint64() != score {
 
 		batch.Delete(_zscore_key(key, member, prev.Uint64()))
 
-	} else if prev.Status == ReplyNotFound {
-		db._raw_incr(_zlen_key(key), 1)
+	} else if prev.Status == skv.ReplyNotFound {
+		db._raw_incrby(_zlen_key(key), 1)
 	}
 
 	//
@@ -65,7 +66,7 @@ func (db *DB) Zset(key, member []byte, score uint64) *Reply {
 	//
 	batch.Put(_zset_key(key, member), []byte(strconv.FormatUint(score, 10)))
 
-	rpl := NewReply("")
+	rpl := skv.NewReply("")
 
 	if err := db.ldb.Write(batch, nil); err != nil {
 		rpl.Status = err.Error()
@@ -74,12 +75,12 @@ func (db *DB) Zset(key, member []byte, score uint64) *Reply {
 	return rpl
 }
 
-func (db *DB) Zrange(key []byte, score_start, score_end, limit uint64) *Reply {
+func (db *DB) Zrange(key []byte, score_start, score_end, limit uint64) *skv.Reply {
 
 	var (
 		bs_start = _zscore_key_prefix(key, score_start)
 		bs_end   = _zscore_key_prefix(key, score_end)
-		rpl      = NewReply("")
+		rpl      = skv.NewReply("")
 	)
 
 	for i := len(bs_end); i < 256; i++ {
@@ -116,18 +117,18 @@ func (db *DB) Zrange(key []byte, score_start, score_end, limit uint64) *Reply {
 	return rpl
 }
 
-func (db *DB) Zdel(key, member []byte) *Reply {
+func (db *DB) Zdel(key, member []byte) *skv.Reply {
 
 	batch := new(leveldb.Batch)
 
 	batch.Delete(_zset_key(key, member))
 
-	if prev := db.Zget(key, member); prev.Status == ReplyOK {
-		db._raw_incr(_zlen_key(key), -1)
+	if prev := db.Zget(key, member); prev.Status == skv.ReplyOK {
+		db._raw_incrby(_zlen_key(key), -1)
 		batch.Delete(_zscore_key(key, member, prev.Uint64()))
 	}
 
-	rpl := NewReply("")
+	rpl := skv.NewReply("")
 
 	if err := db.ldb.Write(batch, nil); err != nil {
 		rpl.Status = err.Error()
@@ -136,6 +137,6 @@ func (db *DB) Zdel(key, member []byte) *Reply {
 	return rpl
 }
 
-func (db *DB) Zlen(key []byte) *Reply {
+func (db *DB) Zlen(key []byte) *skv.Reply {
 	return db._raw_get(_zlen_key(key))
 }
