@@ -2,4 +2,5 @@
 /var
 /store
 /redis_bench
-/vendor/*.zip
+/vendor
+/skv/leveldbgo
