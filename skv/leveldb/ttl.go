@@ -31,7 +31,7 @@ func (db *DB) ttl_worker() {
 			for _, v := range ls {
 
 				wb := levigo.NewWriteBatch()
-				wo := levigo.NewWriteOptions()
+				// wo := levigo.NewWriteOptions()
 
 				wb.Delete(_zscore_key(ns_set_ttl, v.Key, v.Uint64()))
 
@@ -40,9 +40,9 @@ func (db *DB) ttl_worker() {
 					wb.Delete(v.Key)
 				}
 
-				db.ldb.Write(wo, wb)
+				db.ldb.Write(db.writeOpts, wb)
 				wb.Close()
-				wo.Close()
+				// wo.Close()
 
 				db._raw_incrby(_zlen_key(ns_set_ttl), -1)
 			}

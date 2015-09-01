@@ -58,11 +58,11 @@ func (db *DB) _raw_scan(cursor, end []byte, limit uint64) *skv.Reply {
 		limit = scan_max_limit
 	}
 
-	ro := levigo.NewReadOptions()
-	ro.SetFillCache(false)
-	defer ro.Close()
+	// ro := levigo.NewReadOptions()
+	// ro.SetFillCache(false)
+	// defer ro.Close()
 
-	it := db.ldb.NewIterator(ro)
+	it := db.ldb.NewIterator(db.iteratorReadOpts)
 	defer it.Close()
 
 	for it.Seek(cursor); it.Valid(); it.Next() {
@@ -108,11 +108,11 @@ func (db *DB) _raw_revscan(cursor, end []byte, limit uint64) *skv.Reply {
 		limit = scan_max_limit
 	}
 
-	ro := levigo.NewReadOptions()
-	ro.SetFillCache(false)
-	defer ro.Close()
+	// ro := levigo.NewReadOptions()
+	// ro.SetFillCache(false)
+	// defer ro.Close()
 
-	it := db.ldb.NewIterator(ro)
+	it := db.ldb.NewIterator(db.iteratorReadOpts)
 	defer it.Close()
 
 	for it.Seek(cursor); it.Valid(); it.Prev() {
@@ -164,10 +164,10 @@ func (db *DB) _raw_set(key, value []byte, ttl uint64) *skv.Reply {
 		}
 	}
 
-	wo := levigo.NewWriteOptions()
-	defer wo.Close()
+	// wo := levigo.NewWriteOptions()
+	// defer wo.Close()
 
-	if err := db.ldb.Put(wo, key, value); err != nil {
+	if err := db.ldb.Put(db.writeOpts, key, value); err != nil {
 		rpl.Status = err.Error()
 	}
 
@@ -224,10 +224,10 @@ func (db *DB) _raw_get(key []byte) *skv.Reply {
 
 	rpl := skv.NewReply("")
 
-	ro := levigo.NewReadOptions()
-	defer ro.Close()
+	// ro := levigo.NewReadOptions()
+	// defer ro.Close()
 
-	if data, err := db.ldb.Get(ro, key); err != nil || data == nil {
+	if data, err := db.ldb.Get(db.readOpts, key); err != nil || data == nil {
 
 		if data == nil {
 			rpl.Status = skv.ReplyNotFound
@@ -250,14 +250,14 @@ func (db *DB) _raw_del(keys ...[]byte) *skv.Reply {
 	wb := levigo.NewWriteBatch()
 	defer wb.Close()
 
-	wo := levigo.NewWriteOptions()
-	defer wo.Close()
+	// wo := levigo.NewWriteOptions()
+	// defer wo.Close()
 
 	for _, key := range keys {
 		wb.Delete(key)
 	}
 
-	if err := db.ldb.Write(wo, wb); err != nil {
+	if err := db.ldb.Write(db.writeOpts, wb); err != nil {
 		rpl.Status = err.Error()
 	}
 

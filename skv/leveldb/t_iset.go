@@ -54,12 +54,12 @@ func (db *DB) Iscan(key, cursor, end []byte, limit uint64) *skv.Reply {
 		cend = append(cend, 0xff)
 	}
 
-	ro := levigo.NewReadOptions()
-	ro.SetFillCache(false)
-	defer ro.Close()
+	// ro := levigo.NewReadOptions()
+	// ro.SetFillCache(false)
+	// defer ro.Close()
 
 	// it := db.ldb.NewIterator(&util.Range{Start: cstart, Limit: append(cend)}, nil)
-	it := db.ldb.NewIterator(ro)
+	it := db.ldb.NewIterator(db.iteratorReadOpts)
 	defer it.Close()
 
 	for it.Seek(cstart); it.Valid(); it.Next() {
@@ -407,8 +407,8 @@ func (db *DB) Iset(key, prikey []byte, obj interface{}) *skv.Reply {
 	wb := levigo.NewWriteBatch()
 	defer wb.Close()
 
-	wo := levigo.NewWriteOptions()
-	defer wo.Close()
+	// wo := levigo.NewWriteOptions()
+	// defer wo.Close()
 
 	for _, idxkey := range idxdup {
 		wb.Delete(idxkey)
@@ -421,7 +421,7 @@ func (db *DB) Iset(key, prikey []byte, obj interface{}) *skv.Reply {
 	bvalue, _ := jsonEncode(set)
 	wb.Put(bkey, bvalue)
 
-	if err := db.ldb.Write(wo, wb); err != nil {
+	if err := db.ldb.Write(db.writeOpts, wb); err != nil {
 		rpl.Status = err.Error()
 	} else if len_incr {
 		db._raw_incrby(_iset_len_key(key), 1)
@@ -463,8 +463,8 @@ func (db *DB) Idel(key, prikey []byte) *skv.Reply {
 	wb := levigo.NewWriteBatch()
 	defer wb.Close()
 
-	wo := levigo.NewWriteOptions()
-	defer wo.Close()
+	// wo := levigo.NewWriteOptions()
+	// defer wo.Close()
 
 	for piKey, piEntry := range previdx {
 		wb.Delete(append(append(_iset_idx_field_prefix(key, piKey), piEntry.Data...), prikey...))
@@ -472,7 +472,7 @@ func (db *DB) Idel(key, prikey []byte) *skv.Reply {
 
 	wb.Delete(bkey)
 
-	if err := db.ldb.Write(wo, wb); err != nil {
+	if err := db.ldb.Write(db.writeOpts, wb); err != nil {
 		rpl.Status = err.Error()
 	}
 

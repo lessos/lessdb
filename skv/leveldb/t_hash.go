@@ -17,7 +17,7 @@ package leveldb
 import (
 	"bytes"
 
-	"github.com/jmhodges/levigo"
+	// "github.com/jmhodges/levigo"
 	"github.com/lessos/lessdb/skv"
 )
 
@@ -67,11 +67,11 @@ func (db *DB) Hscan(key, cursor, end []byte, limit uint64) *skv.Reply {
 		cend = append(cend, 0xff)
 	}
 
-	ro := levigo.NewReadOptions()
-	ro.SetFillCache(false)
-	defer ro.Close()
+	// ro := levigo.NewReadOptions()
+	// ro.SetFillCache(false)
+	// defer ro.Close()
 
-	it := db.ldb.NewIterator(ro)
+	it := db.ldb.NewIterator(db.iteratorReadOpts)
 	defer it.Close()
 
 	for it.Seek(cstart); it.Valid(); it.Next() {

@@ -52,8 +52,8 @@ func (db *DB) Zset(key, member []byte, score uint64) *skv.Reply {
 	wb := levigo.NewWriteBatch()
 	defer wb.Close()
 
-	wo := levigo.NewWriteOptions()
-	defer wo.Close()
+	// wo := levigo.NewWriteOptions()
+	// defer wo.Close()
 
 	//
 	if prev := db.Zget(key, member); prev.Status == skv.ReplyOK && prev.Uint64() != score {
@@ -72,7 +72,7 @@ func (db *DB) Zset(key, member []byte, score uint64) *skv.Reply {
 
 	rpl := skv.NewReply("")
 
-	if err := db.ldb.Write(wo, wb); err != nil {
+	if err := db.ldb.Write(db.writeOpts, wb); err != nil {
 		rpl.Status = err.Error()
 	}
 
@@ -91,11 +91,11 @@ func (db *DB) Zrange(key []byte, score_start, score_end, limit uint64) *skv.Repl
 		bs_end = append(bs_end, 0xff)
 	}
 
-	ro := levigo.NewReadOptions()
-	ro.SetFillCache(false)
-	defer ro.Close()
+	// ro := levigo.NewReadOptions()
+	// ro.SetFillCache(false)
+	// defer ro.Close()
 
-	it := db.ldb.NewIterator(ro)
+	it := db.ldb.NewIterator(db.iteratorReadOpts)
 	defer it.Close()
 
 	for it.Seek(bs_start); it.Valid(); it.Next() {
@@ -133,8 +133,8 @@ func (db *DB) Zdel(key, member []byte) *skv.Reply {
 	wb := levigo.NewWriteBatch()
 	defer wb.Close()
 
-	wo := levigo.NewWriteOptions()
-	defer wo.Close()
+	// wo := levigo.NewWriteOptions()
+	// defer wo.Close()
 
 	wb.Delete(_zset_key(key, member))
 
@@ -145,7 +145,7 @@ func (db *DB) Zdel(key, member []byte) *skv.Reply {
 
 	rpl := skv.NewReply("")
 
-	if err := db.ldb.Write(wo, wb); err != nil {
+	if err := db.ldb.Write(db.writeOpts, wb); err != nil {
 		rpl.Status = err.Error()
 	}
 

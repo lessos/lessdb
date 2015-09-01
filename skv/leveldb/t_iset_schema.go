@@ -158,16 +158,16 @@ func (db *DB) IschemaSet(key []byte, schema IsetSchema) *skv.Reply {
 				if len(rs) > 0 {
 
 					wb := levigo.NewWriteBatch()
-					wo := levigo.NewWriteOptions()
+					// wo := levigo.NewWriteOptions()
 
 					for _, entry := range rs {
 						wb.Delete(entry.Key)
 					}
 
-					db.ldb.Write(wo, wb)
+					db.ldb.Write(db.writeOpts, wb)
 
 					wb.Close()
-					wo.Close()
+					// wo.Close()
 				}
 
 				if len(rs) < limit {
@@ -247,7 +247,7 @@ func (db *DB) IschemaSet(key []byte, schema IsetSchema) *skv.Reply {
 				rs := db.Iscan(key, offset, []byte{}, uint64(limit)).Hash()
 
 				wb := levigo.NewWriteBatch()
-				wo := levigo.NewWriteOptions()
+				// wo := levigo.NewWriteOptions()
 
 				for _, entry := range rs {
 
@@ -273,9 +273,9 @@ func (db *DB) IschemaSet(key []byte, schema IsetSchema) *skv.Reply {
 					}
 				}
 
-				db.ldb.Write(wo, wb)
+				db.ldb.Write(db.writeOpts, wb)
 				wb.Close()
-				wo.Close()
+				// wo.Close()
 
 				if len(rs) < limit {
 					break

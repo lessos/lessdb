@@ -21,8 +21,17 @@ import (
 	"github.com/lessos/lessdb/skv"
 )
 
+const (
+	KiB = 1024
+	MiB = KiB * 1024
+	GiB = MiB * 1024
+)
+
 type DB struct {
-	ldb *levigo.DB
+	ldb              *levigo.DB
+	readOpts         *levigo.ReadOptions
+	writeOpts        *levigo.WriteOptions
+	iteratorReadOpts *levigo.ReadOptions
 }
 
 func Open(cfg skv.Config) (*DB, error) {
@@ -34,13 +43,30 @@ func Open(cfg skv.Config) (*DB, error) {
 
 	opts := levigo.NewOptions()
 	opts.SetCreateIfMissing(true)
-	opts.SetCache(levigo.NewLRUCache(3 << 30))
+	opts.SetCache(levigo.NewLRUCache(cfg.CacheCapacity * MiB))
+	opts.SetWriteBufferSize(cfg.WriteBuffer * MiB)
+	opts.SetBlockSize(4 * KiB)
 	opts.SetFilterPolicy(levigo.NewBloomFilter(10))
 	opts.SetCompression(levigo.SnappyCompression)
 	opts.SetMaxOpenFiles(500)
 
+	// fmt.Println("cache", cfg.CacheCapacity, "WriteBuffer", cfg.WriteBuffer)
+
 	db.ldb, err = levigo.Open(cfg.DataDir+"/0.0", opts)
 
+	//
+	db.readOpts = levigo.NewReadOptions()
+	db.readOpts.SetFillCache(true)
+
+	//
+	db.writeOpts = levigo.NewWriteOptions()
+
+	//
+
+	db.iteratorReadOpts = levigo.NewReadOptions()
+	db.iteratorReadOpts.SetFillCache(false)
+
+	//
 	if err == nil {
 		db.ttl_worker()
 		fmt.Println("lessdb/skv.DB opened")
@@ -50,5 +76,10 @@ func Open(cfg skv.Config) (*DB, error) {
 }
 
 func (db *DB) Close() {
+
+	db.iteratorReadOpts.Close()
+	db.writeOpts.Close()
+	db.readOpts.Close()
+
 	db.ldb.Close()
 }
