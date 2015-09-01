@@ -41,14 +41,18 @@ func Open(cfg skv.Config) (*DB, error) {
 		err error
 	)
 
+	cfg.ReFix()
+
 	opts := levigo.NewOptions()
 	opts.SetCreateIfMissing(true)
-	opts.SetCache(levigo.NewLRUCache(cfg.CacheCapacity * MiB))
+
 	opts.SetWriteBufferSize(cfg.WriteBuffer * MiB)
+	opts.SetCache(levigo.NewLRUCache(cfg.CacheCapacity * MiB))
+	opts.SetMaxOpenFiles(cfg.OpenFilesCacheCapacity)
+
 	opts.SetBlockSize(4 * KiB)
 	opts.SetFilterPolicy(levigo.NewBloomFilter(10))
 	opts.SetCompression(levigo.SnappyCompression)
-	opts.SetMaxOpenFiles(500)
 
 	// fmt.Println("cache", cfg.CacheCapacity, "WriteBuffer", cfg.WriteBuffer)
 

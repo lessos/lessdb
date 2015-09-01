@@ -35,20 +35,17 @@ func Open(cfg skv.Config) (*DB, error) {
 		err error
 	)
 
+	cfg.ReFix()
+
 	os.MkdirAll(cfg.DataDir+"/0.0", 0750)
 
 	db.ldb, err = leveldb.OpenFile(cfg.DataDir+"/0.0", &opt.Options{
-		// WriteL0SlowdownTrigger: 16, // default 8
-		// WriteL0PauseTrigger:    64, // default 12
-		CompactionTableSize: cfg.CompactionTableSize * opt.MiB,
-		// CompactionGPOverlapsFactor: 20,
-		// CompactionTotalSize: 5 * 32 * opt.MiB,
-		OpenFilesCacheCapacity: 500,
+		WriteBuffer:            cfg.WriteBuffer * opt.MiB,
+		BlockCacheCapacity:     cfg.BlockCacheCapacity * opt.MiB,
+		OpenFilesCacheCapacity: cfg.OpenFilesCacheCapacity,
+		CompactionTableSize:    cfg.CompactionTableSize * opt.MiB,
 		Compression:            opt.SnappyCompression,
 		Filter:                 filter.NewBloomFilter(10),
-		BlockCacheCapacity:     cfg.BlockCacheCapacity * opt.MiB,
-		// BlockSize:              4 * opt.KiB,
-		WriteBuffer: cfg.WriteBuffer * opt.MiB,
 	})
 
 	if err == nil {
