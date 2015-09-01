@@ -17,6 +17,7 @@ package skv
 type Config struct {
 	Driver              string `json:"driver,omitempty"`
 	DataDir             string `json:"datadir,omitempty"`
+	CacheCapacity       int    `json:"cache_capacity,omitempty"`
 	CompactionTableSize int
 	BlockCacheCapacity  int
 	WriteBuffer         int
@@ -26,8 +27,9 @@ var (
 	DefaultConfig = Config{
 		Driver:              "goleveldb",
 		DataDir:             "./var",
+		CacheCapacity:       8,
 		CompactionTableSize: 2, // 16 // up-default 2 MiB
 		BlockCacheCapacity:  8, // 64, // up-default 8 MiB
-		WriteBuffer:         4, // 16, // up-default 4 MiB
+		WriteBuffer:         4, // 4 MiB
 	}
 )
