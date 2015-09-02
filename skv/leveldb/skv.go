@@ -15,7 +15,7 @@
 package leveldb
 
 const (
-	ttl_job_sleep            = 500e6
+	ttl_job_sleep            = 300e6
 	ttl_job_limit     uint64 = 10000
 	scan_max_limit    uint64 = 10000
 	ns_zero                  = 0x00
