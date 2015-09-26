@@ -21,12 +21,6 @@ import (
 	"github.com/lessos/lessdb/skv"
 )
 
-const (
-	KiB = 1024
-	MiB = KiB * 1024
-	GiB = MiB * 1024
-)
-
 type DB struct {
 	ldb              *levigo.DB
 	readOpts         *levigo.ReadOptions
@@ -46,11 +40,11 @@ func Open(cfg skv.Config) (*DB, error) {
 	opts := levigo.NewOptions()
 	opts.SetCreateIfMissing(true)
 
-	opts.SetWriteBufferSize(cfg.WriteBuffer * MiB)
-	opts.SetCache(levigo.NewLRUCache(cfg.CacheCapacity * MiB))
+	opts.SetWriteBufferSize(cfg.WriteBuffer * skv.MiB)
+	opts.SetCache(levigo.NewLRUCache(cfg.CacheCapacity * skv.MiB))
 	opts.SetMaxOpenFiles(cfg.OpenFilesCacheCapacity)
 
-	opts.SetBlockSize(4 * KiB)
+	opts.SetBlockSize(4 * skv.KiB)
 	opts.SetFilterPolicy(levigo.NewBloomFilter(10))
 	opts.SetCompression(levigo.SnappyCompression)
 

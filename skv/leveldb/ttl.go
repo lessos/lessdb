@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/jmhodges/levigo"
+	"github.com/lessos/lessdb/skv"
 )
 
 func (db *DB) ttl_worker() {
@@ -26,17 +27,17 @@ func (db *DB) ttl_worker() {
 
 		for {
 
-			ls := db.Zrange(ns_set_ttl, 0, timeNowMS(), ttl_job_limit).Hash()
+			ls := db.Zrange(skv.SetTtlPrefix(), 0, skv.TimeNowMS(), skv.TtlJobLimit).Hash()
 
 			for _, v := range ls {
 
 				wb := levigo.NewWriteBatch()
 				// wo := levigo.NewWriteOptions()
 
-				wb.Delete(_zscore_key(ns_set_ttl, v.Key, v.Uint64()))
+				wb.Delete(skv.ZsetScoreKey(skv.SetTtlPrefix(), v.Key, v.Uint64()))
 
-				if rs := db.Zget(ns_set_ttl, v.Key).Uint64(); rs == v.Uint64() {
-					wb.Delete(_zset_key(ns_set_ttl, v.Key))
+				if rs := db.Zget(skv.SetTtlPrefix(), v.Key).Uint64(); rs == v.Uint64() {
+					wb.Delete(skv.ZsetKey(skv.SetTtlPrefix(), v.Key))
 					wb.Delete(v.Key)
 				}
 
@@ -44,11 +45,11 @@ func (db *DB) ttl_worker() {
 				wb.Close()
 				// wo.Close()
 
-				db._raw_incrby(_zlen_key(ns_set_ttl), -1)
+				db._raw_incrby(skv.ZsetLenKey(skv.SetTtlPrefix()), -1)
 			}
 
-			if uint64(len(ls)) < ttl_job_limit {
-				time.Sleep(ttl_job_sleep)
+			if uint64(len(ls)) < skv.TtlJobLimit {
+				time.Sleep(skv.TtlJobSleep)
 			}
 		}
 	}()

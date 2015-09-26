@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package leveldb
+package skv
 
 import (
 	"crypto/sha1"
@@ -23,35 +23,35 @@ import (
 	"strings"
 )
 
-func _iset_schema_key(key []byte) []byte {
-	return _raw_key_encode(ns_iset_schema, key)
+func IsetSchemaKey(key []byte) []byte {
+	return RawKeyEncode(ns_iset_schema, key)
 }
 
-func _iset_entry_key_prefix(key []byte) []byte {
-	return _raw_key_encode(ns_iset_entry, key)
+func IsetEntryKeyPrefix(key []byte) []byte {
+	return RawKeyEncode(ns_iset_entry, key)
 }
 
-func _iset_entry_key(key, prikey []byte) []byte {
-	return append(_iset_entry_key_prefix(key), prikey...)
+func IsetEntryKey(key, prikey []byte) []byte {
+	return append(IsetEntryKeyPrefix(key), prikey...)
 }
 
-func _iset_len_key(key []byte) []byte {
-	return _raw_key_encode(ns_iset_length, key)
+func IsetLenKey(key []byte) []byte {
+	return RawKeyEncode(ns_iset_length, key)
 }
 
 func _iset_idx_key_prefix(key []byte) []byte {
-	return _raw_key_encode(ns_iset_index, key)
+	return RawKeyEncode(ns_iset_index, key)
 }
 
-func _iset_idx_field_prefix(key []byte, column uint8) []byte {
+func IsetIndexFieldPrefix(key []byte, column uint8) []byte {
 	return append(_iset_idx_key_prefix(key), column)
 }
 
-func _iset_idx_increment_key(key []byte, column uint8) []byte {
-	return append(_raw_key_encode(ns_iset_increment, key), column)
+func IsetIndexIncrKey(key []byte, column uint8) []byte {
+	return append(RawKeyEncode(ns_iset_increment, key), column)
 }
 
-func _iset_bytes_incr(key []byte) []byte {
+func IsetBytesIncr(key []byte) []byte {
 
 	for i := (len(key) - 1); i >= 0; i-- {
 
@@ -66,7 +66,7 @@ func _iset_bytes_incr(key []byte) []byte {
 	return key
 }
 
-func _iset_bytes_decr(key []byte) []byte {
+func IsetBytesDecr(key []byte) []byte {
 
 	for i := (len(key) - 1); i >= 0; i-- {
 
@@ -81,7 +81,7 @@ func _iset_bytes_decr(key []byte) []byte {
 	return key
 }
 
-func _iset_idx_rawkey_export(data []byte, ilen uint8) ([]byte, []byte, bool) {
+func IsetIndexRawKeyExport(data []byte, ilen uint8) ([]byte, []byte, bool) {
 
 	if len(data) < 7 {
 		return []byte{}, []byte{}, false
@@ -98,7 +98,7 @@ func _iset_idx_rawkey_export(data []byte, ilen uint8) ([]byte, []byte, bool) {
 	return data[kplen:pken], data[pken:], true
 }
 
-func _iset_bytes_to_uint64(key []byte) uint64 {
+func IsetBytesToUint64(key []byte) uint64 {
 
 	if len(key) < 1 || len(key) > 8 {
 		return 0
@@ -115,7 +115,7 @@ func _iset_bytes_to_uint64(key []byte) uint64 {
 	return binary.BigEndian.Uint64(uibs)
 }
 
-func _iset_idx_string_filter(key string) string {
+func IsetIndexStringFilter(key string) string {
 	return strings.ToLower(strings.TrimSpace(key))
 }
 
@@ -127,7 +127,7 @@ func _iset_idx_string_to_bytes(key string) []byte {
 	return h.Sum(nil)
 }
 
-func _iset_idx_sint_to_bytes(sint string, lg uint8) []byte {
+func IsetIndexSintToBytes(sint string, lg uint8) []byte {
 
 	if lg < 1 {
 		lg = 1
@@ -144,7 +144,7 @@ func _iset_idx_sint_to_bytes(sint string, lg uint8) []byte {
 	return uibs[8-lg:]
 }
 
-func _iset_idx_value(idx *IsetEntry, value reflect.Value) ([]byte, bool) {
+func IsetIndexValue(idx *IsetEntry, value reflect.Value) ([]byte, bool) {
 
 	ui64, bs := uint64(0), []byte{}
 
@@ -185,7 +185,7 @@ func _iset_idx_value(idx *IsetEntry, value reflect.Value) ([]byte, bool) {
 		if idx.Type == IsetTypeUint {
 			ui64, _ = strconv.ParseUint(value.String(), 10, 64)
 		} else {
-			bs = _iset_idx_string_to_bytes(_iset_idx_string_filter(value.String()))
+			bs = _iset_idx_string_to_bytes(IsetIndexStringFilter(value.String()))
 		}
 
 	//
@@ -226,52 +226,4 @@ func _iset_idx_value(idx *IsetEntry, value reflect.Value) ([]byte, bool) {
 	}
 
 	return bs, (len(bs) == int(idx.Length))
-}
-
-func _iset_idx_data_export(key []byte, obj map[string]interface{}) map[uint8]IsetEntryBytes {
-
-	ls := map[uint8]IsetEntryBytes{}
-
-	schema, ok := _iset_indexes[string(key)]
-	if !ok {
-		return ls
-	}
-
-	for mk, mv := range obj {
-
-		if ie := schema.IndexEntry(mk); ie != nil {
-
-			if bs, ok := _iset_idx_value(ie, reflect.ValueOf(mv)); ok {
-
-				ls[ie.Seq] = IsetEntryBytes{
-					Unique:    ie.Unique,
-					AutoIncr:  ie.AutoIncr,
-					Data:      bs,
-					FieldName: mk,
-				}
-			}
-
-			if len(ls) >= len(schema.Indexes) {
-				break
-			}
-		}
-	}
-
-	for _, ie := range schema.Indexes {
-
-		if ie.AutoIncr {
-
-			if _, ok := ls[ie.Seq]; !ok {
-
-				ls[ie.Seq] = IsetEntryBytes{
-					Unique:    ie.Unique,
-					AutoIncr:  ie.AutoIncr,
-					Data:      make([]byte, ie.Length),
-					FieldName: ie.Column,
-				}
-			}
-		}
-	}
-
-	return ls
 }

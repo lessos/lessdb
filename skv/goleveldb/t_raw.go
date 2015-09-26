@@ -27,21 +27,6 @@ var (
 	_raw_incr_locker sync.Mutex
 )
 
-func _raw_key_encode(ns byte, key []byte) []byte {
-
-	si := len(key)
-	if si > 255 {
-		si = 255
-		key = key[:255]
-	}
-
-	return append([]byte{ns, uint8(si)}, key...)
-}
-
-func (db *DB) RawScan(cursor, end []byte, limit uint64) *skv.Reply {
-	return db._raw_scan(cursor, end, limit)
-}
-
 func (db *DB) _raw_scan(cursor, end []byte, limit uint64) *skv.Reply {
 
 	rpl := skv.NewReply("")
@@ -54,8 +39,8 @@ func (db *DB) _raw_scan(cursor, end []byte, limit uint64) *skv.Reply {
 		end = append(end, 0xff)
 	}
 
-	if limit > scan_max_limit {
-		limit = scan_max_limit
+	if limit > skv.ScanMaxLimit {
+		limit = skv.ScanMaxLimit
 	}
 
 	iter := db.ldb.NewIterator(&util.Range{Start: cursor, Limit: end}, nil)
@@ -66,8 +51,8 @@ func (db *DB) _raw_scan(cursor, end []byte, limit uint64) *skv.Reply {
 			break
 		}
 
-		rpl.Data = append(rpl.Data, bytesClone(iter.Key()))
-		rpl.Data = append(rpl.Data, bytesClone(iter.Value()))
+		rpl.Data = append(rpl.Data, skv.BytesClone(iter.Key()))
+		rpl.Data = append(rpl.Data, skv.BytesClone(iter.Value()))
 
 		limit--
 	}
@@ -97,8 +82,8 @@ func (db *DB) _raw_revscan(cursor, end []byte, limit uint64) *skv.Reply {
 		end = append(end, 0xff)
 	}
 
-	if limit < scan_max_limit {
-		limit = scan_max_limit
+	if limit < skv.ScanMaxLimit {
+		limit = skv.ScanMaxLimit
 	}
 
 	iter := db.ldb.NewIterator(&util.Range{Start: cursor, Limit: end}, nil)
@@ -109,8 +94,8 @@ func (db *DB) _raw_revscan(cursor, end []byte, limit uint64) *skv.Reply {
 			break
 		}
 
-		rpl.Data = append(rpl.Data, bytesClone(iter.Key()))
-		rpl.Data = append(rpl.Data, bytesClone(iter.Value()))
+		rpl.Data = append(rpl.Data, skv.BytesClone(iter.Key()))
+		rpl.Data = append(rpl.Data, skv.BytesClone(iter.Value()))
 
 		limit--
 	}
@@ -126,7 +111,7 @@ func (db *DB) _raw_revscan(cursor, end []byte, limit uint64) *skv.Reply {
 
 func (db *DB) _raw_set_json(key []byte, value interface{}, ttl uint64) *skv.Reply {
 
-	bvalue, err := jsonEncode(value)
+	bvalue, err := skv.JsonEncode(value)
 	if err != nil {
 		return skv.NewReply(err.Error())
 	}
@@ -144,7 +129,7 @@ func (db *DB) _raw_set(key, value []byte, ttl uint64) *skv.Reply {
 			return rpl
 		}
 
-		rpl = db.Zset(ns_set_ttl, key, timeNowMS()+ttl)
+		rpl = db.Zset(skv.SetTtlPrefix(), key, skv.TimeNowMS()+ttl)
 		if rpl.Status != skv.ReplyOK {
 			return rpl
 		}
@@ -159,7 +144,7 @@ func (db *DB) _raw_set(key, value []byte, ttl uint64) *skv.Reply {
 
 func (db *DB) _raw_ttl(key []byte) *skv.Reply {
 
-	ttl := db.Zget(ns_set_ttl, key).Int64() - int64(timeNowMS())
+	ttl := db.Zget(skv.SetTtlPrefix(), key).Int64() - int64(skv.TimeNowMS())
 	if ttl < 0 {
 		ttl = -1
 	}

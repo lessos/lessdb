@@ -141,7 +141,7 @@ func (r *Reply) Hash() []Entry {
 }
 
 func (r *Reply) JsonDecode(v interface{}) error {
-	return jsonDecode(r.Bytes(), v)
+	return JsonDecode(r.Bytes(), v)
 }
 
 func (e *Entry) String() string {
@@ -158,5 +158,5 @@ func (e *Entry) Uint64() uint64 {
 }
 
 func (e *Entry) JsonDecode(v interface{}) error {
-	return jsonDecode(e.Value, v)
+	return JsonDecode(e.Value, v)
 }

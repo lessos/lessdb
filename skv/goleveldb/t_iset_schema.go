@@ -21,102 +21,31 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
-const (
-	IsetTypeBinary    uint8 = 0
-	IsetTypeUint      uint8 = 1
-	IsetTypeString    uint8 = 2
-	IsetTypeHexString uint8 = 3
+var (
+	_iset_indexes = map[string]skv.IsetSchema{}
 )
 
-const (
-	_iset_keylen_max              = 16
-	_iset_prilen_max              = 16
-	_iset_schema_max_index        = 20
-	_iset_indexing                = false
-	_iset_scan_max         uint64 = 10000
-)
-
-type IsetSchema struct {
-	Version uint32      `json:"version"`
-	Indexes []IsetEntry `json:"indexes"`
-}
-
-func (is *IsetSchema) IndexEntry(column string) *IsetEntry {
-
-	column = _iset_idx_string_filter(column)
-
-	for _, ie := range is.Indexes {
-
-		if ie.Column == column {
-			return &ie
-		}
-	}
-
-	return nil
-}
-
-type IsetEntry struct {
-	Column   string `json:"column"`
-	Type     uint8  `json:"type"`
-	Length   uint8  `json:"length,omitempty"`
-	Unique   bool   `json:"unique,omitempty"`
-	AutoIncr bool   `json:"autoincr,omitempty"`
-	Seq      uint8  `json:"seq,omitempty"`
-}
-
-type IsetEntryBytes struct {
-	Seq       uint8
-	Unique    bool
-	AutoIncr  bool
-	FieldName string
-	Data      []byte
-}
-
-func NewIschema(version uint32) IsetSchema {
-	return IsetSchema{
-		Version: version,
-	}
-}
-
-func (is *IsetSchema) IndexEntryAdd(ie IsetEntry) {
-
-	if len(is.Indexes) > _iset_schema_max_index {
-		return
-	}
-
-	ie.Column = _iset_idx_string_filter(ie.Column)
-
-	for _, prev := range is.Indexes {
-
-		if prev.Column == ie.Column {
-			return
-		}
-	}
-
-	is.Indexes = append(is.Indexes, ie)
-}
-
-func (db *DB) IschemaSet(key []byte, schema IsetSchema) *skv.Reply {
+func (db *DB) IschemaSet(key []byte, schema skv.IsetSchema) *skv.Reply {
 
 	_iset_global_locker.Lock()
 	defer _iset_global_locker.Unlock()
 
 	var (
 		rpl  = skv.NewReply("")
-		prev IsetSchema
+		prev skv.IsetSchema
 	)
 
-	if len(schema.Indexes) > _iset_schema_max_index {
+	if len(schema.Indexes) > skv.IsetSchemaMaxIndex {
 		rpl.Status = skv.ReplyInvalidArgument
 		return rpl
 	}
 
-	if rs := db._raw_get(_iset_schema_key(key)); rs.Status == "OK" {
+	if rs := db._raw_get(skv.IsetSchemaKey(key)); rs.Status == "OK" {
 		rs.JsonDecode(&prev)
 	}
 
 	for i, ei := range schema.Indexes {
-		ei.Column = _iset_idx_string_filter(ei.Column)
+		ei.Column = skv.IsetIndexStringFilter(ei.Column)
 		schema.Indexes[i] = ei
 	}
 
@@ -148,7 +77,7 @@ func (db *DB) IschemaSet(key []byte, schema IsetSchema) *skv.Reply {
 
 		if removed || changed {
 
-			objIdxKeyPrefix, limit := _iset_idx_field_prefix(key, pi.Seq), 1000
+			objIdxKeyPrefix, limit := skv.IsetIndexFieldPrefix(key, pi.Seq), 1000
 
 			// fmt.Println("WARN CLEAN prev INDEXES", pi.Column)
 			for {
@@ -250,14 +179,14 @@ func (db *DB) IschemaSet(key []byte, schema IsetSchema) *skv.Reply {
 
 						for mk, mv := range obj {
 
-							mk = _iset_idx_string_filter(mk)
+							mk = skv.IsetIndexStringFilter(mk)
 
 							if mk != ei.Column {
 								continue
 							}
 
-							if bs, ok := _iset_idx_value(&ei, reflect.ValueOf(mv)); ok {
-								batch.Put(append(append(_iset_idx_field_prefix(key, ei.Seq), bs...), entry.Key...), []byte{})
+							if bs, ok := skv.IsetIndexValue(&ei, reflect.ValueOf(mv)); ok {
+								batch.Put(append(append(skv.IsetIndexFieldPrefix(key, ei.Seq), bs...), entry.Key...), []byte{})
 							}
 
 							break
@@ -278,7 +207,7 @@ func (db *DB) IschemaSet(key []byte, schema IsetSchema) *skv.Reply {
 
 	skey := string(key)
 
-	rpl = db._raw_set_json(_iset_schema_key(key), schema, 0)
+	rpl = db._raw_set_json(skv.IsetSchemaKey(key), schema, 0)
 	if rpl.Status == "OK" {
 		_iset_indexes[skey] = schema
 	}

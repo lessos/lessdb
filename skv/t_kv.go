@@ -12,41 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package goleveldb
+package skv
 
-import (
-	"bytes"
-	"encoding/json"
-	"errors"
-	"time"
-)
-
-func timeNowMS() uint64 {
-	return uint64(time.Now().UTC().UnixNano() / 1e6)
+func SetKey(key []byte) []byte {
+	return append([]byte{ns_set_entry}, key...)
 }
 
-func bytesClone(src []byte) []byte {
-
-	dst := make([]byte, len(src))
-	copy(dst, src)
-
-	return dst
-}
-
-func jsonDecode(src []byte, js interface{}) (err error) {
-
-	defer func() {
-		if r := recover(); r != nil {
-			err = errors.New("json: invalid format")
-		}
-	}()
-
-	d := json.NewDecoder(bytes.NewBuffer(src))
-	d.UseNumber()
-
-	return d.Decode(&js)
-}
-
-func jsonEncode(js interface{}) ([]byte, error) {
-	return json.Marshal(js)
+func SetTtlPrefix() []byte {
+	return ns_set_ttl
 }

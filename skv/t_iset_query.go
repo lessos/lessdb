@@ -12,18 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package goleveldb
+package skv
 
 import (
 	"strings"
 )
 
 const (
-	QueryFilterValues uint8 = 0
-	QueryFilterRange  uint8 = 1
-	QueryFilterMax          = 4
-	QueryOffsetMax          = 100000
-	QueryLimitMax           = 10000
+	QueryFilterValues  uint8 = 0
+	QueryFilterRange   uint8 = 1
+	QueryOffsetMax           = 100000
+	QueryLimitMax            = 10000
+	_iquery_filter_max       = 4
 )
 
 const (
@@ -33,10 +33,10 @@ const (
 
 type QuerySet struct {
 	Filters   []QueryFilter
-	limit     int
-	offset    int
-	sortField string
-	sortMode  string
+	Limit     int
+	Offset    int
+	SortField string
+	SortMode  string
 }
 
 type QueryFilter struct {
@@ -47,15 +47,16 @@ type QueryFilter struct {
 }
 
 func NewQuery() *QuerySet {
+
 	return &QuerySet{
-		limit:   1,
+		Limit:   1,
 		Filters: []QueryFilter{},
 	}
 }
 
 func (q *QuerySet) Filter(field string, values []string, exclude bool) *QuerySet {
 
-	if len(q.Filters) < QueryFilterMax {
+	if len(q.Filters) < _iquery_filter_max {
 
 		q.Filters = append(q.Filters, QueryFilter{
 			Type:    QueryFilterValues,
@@ -68,26 +69,22 @@ func (q *QuerySet) Filter(field string, values []string, exclude bool) *QuerySet
 	return q
 }
 
-// func (q *QuerySet) FilterRange(fit string, min, max uint64, exclude bool) *QuerySet {
-// 	return q
-// }
-
 func (q *QuerySet) Limits(offset, limit int) *QuerySet {
 
 	if offset > QueryOffsetMax {
-		q.offset = QueryOffsetMax
+		q.Offset = QueryOffsetMax
 	} else if offset < 0 {
-		q.offset = 0
+		q.Offset = 0
 	} else {
-		q.offset = offset
+		q.Offset = offset
 	}
 
 	if limit > QueryLimitMax {
-		q.limit = QueryLimitMax
+		q.Limit = QueryLimitMax
 	} else if limit < 1 {
-		q.limit = 1
+		q.Limit = 1
 	} else {
-		q.limit = limit
+		q.Limit = limit
 	}
 
 	return q
@@ -95,12 +92,12 @@ func (q *QuerySet) Limits(offset, limit int) *QuerySet {
 
 func (q *QuerySet) Sort(mode, field string) *QuerySet {
 
-	q.sortMode = strings.ToLower(mode)
-	if q.sortMode != QuerySortAttrDesc {
-		q.sortMode = QuerySortAttrAsc
+	q.SortMode = strings.ToLower(mode)
+	if q.SortMode != QuerySortAttrDesc {
+		q.SortMode = QuerySortAttrAsc
 	}
 
-	q.sortField = strings.ToLower(field)
+	q.SortField = strings.ToLower(field)
 
 	return q
 }

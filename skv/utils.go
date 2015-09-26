@@ -21,11 +21,11 @@ import (
 	"time"
 )
 
-func timeNowMS() uint64 {
+func TimeNowMS() uint64 {
 	return uint64(time.Now().UTC().UnixNano() / 1e6)
 }
 
-func bytesClone(src []byte) []byte {
+func BytesClone(src []byte) []byte {
 
 	dst := make([]byte, len(src))
 	copy(dst, src)
@@ -33,7 +33,7 @@ func bytesClone(src []byte) []byte {
 	return dst
 }
 
-func jsonDecode(src []byte, js interface{}) (err error) {
+func JsonDecode(src []byte, js interface{}) (err error) {
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -47,6 +47,6 @@ func jsonDecode(src []byte, js interface{}) (err error) {
 	return d.Decode(&js)
 }
 
-func jsonEncode(js interface{}) ([]byte, error) {
+func JsonEncode(js interface{}) ([]byte, error) {
 	return json.Marshal(js)
 }

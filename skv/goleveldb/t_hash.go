@@ -19,42 +19,18 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
-func _hset_key_prefix(key []byte) []byte {
-
-	si := len(key)
-	if si > 255 {
-		si = 255
-	}
-
-	return append([]byte{ns_hash_entry, uint8(si)}, key...)
-}
-
-func _hset_key(key, field []byte) []byte {
-	return append(_hset_key_prefix(key), field...)
-}
-
-func _hlen_key(key []byte) []byte {
-
-	si := len(key)
-	if si > 255 {
-		si = 255
-	}
-
-	return append([]byte{ns_hash_len, uint8(si)}, key...)
-}
-
 func (db *DB) Hget(key, field []byte) *skv.Reply {
-	return db._raw_get(_hset_key(key, field))
+	return db._raw_get(skv.HashKey(key, field))
 }
 
 func (db *DB) Hscan(key, cursor, end []byte, limit uint64) *skv.Reply {
 
-	if limit > scan_max_limit {
-		limit = scan_max_limit
+	if limit > skv.ScanMaxLimit {
+		limit = skv.ScanMaxLimit
 	}
 
 	var (
-		prefix = _hset_key_prefix(key)
+		prefix = skv.HashKeyPrefix(key)
 		prelen = len(prefix)
 		cstart = append(prefix, cursor...)
 		cend   = append(prefix, end...)
@@ -77,8 +53,8 @@ func (db *DB) Hscan(key, cursor, end []byte, limit uint64) *skv.Reply {
 			continue
 		}
 
-		rpl.Data = append(rpl.Data, bytesClone(iter.Key()[prelen:]))
-		rpl.Data = append(rpl.Data, bytesClone(iter.Value()))
+		rpl.Data = append(rpl.Data, skv.BytesClone(iter.Key()[prelen:]))
+		rpl.Data = append(rpl.Data, skv.BytesClone(iter.Value()))
 
 		limit--
 	}
@@ -94,10 +70,10 @@ func (db *DB) Hscan(key, cursor, end []byte, limit uint64) *skv.Reply {
 
 func (db *DB) Hset(key, field, value []byte, uul uint64) *skv.Reply {
 
-	bkey := _hset_key(key, field)
+	bkey := skv.HashKey(key, field)
 
 	if rs := db._raw_get(bkey); rs.Status == skv.ReplyNotFound {
-		db._raw_incrby(_hlen_key(key), 1)
+		db._raw_incrby(skv.HashLenKey(key), 1)
 	}
 
 	return db._raw_set(bkey, value, 0)
@@ -105,10 +81,10 @@ func (db *DB) Hset(key, field, value []byte, uul uint64) *skv.Reply {
 
 func (db *DB) HsetJson(key, field []byte, value interface{}, ttl uint64) *skv.Reply {
 
-	bkey := _hset_key(key, field)
+	bkey := skv.HashKey(key, field)
 
 	if rs := db._raw_get(bkey); rs.Status == skv.ReplyNotFound {
-		db._raw_incrby(_hlen_key(key), 1)
+		db._raw_incrby(skv.HashLenKey(key), 1)
 	}
 
 	return db._raw_set_json(bkey, value, 0)
@@ -116,11 +92,11 @@ func (db *DB) HsetJson(key, field []byte, value interface{}, ttl uint64) *skv.Re
 
 func (db *DB) Hdel(key, field []byte) *skv.Reply {
 
-	bkey := _hset_key(key, field)
+	bkey := skv.HashKey(key, field)
 	rpl := skv.NewReply("")
 
 	if rs := db._raw_get(bkey); rs.Status == skv.ReplyOK {
-		db._raw_incrby(_hlen_key(key), -1)
+		db._raw_incrby(skv.HashLenKey(key), -1)
 		rpl = db._raw_del(bkey)
 	}
 
@@ -128,5 +104,5 @@ func (db *DB) Hdel(key, field []byte) *skv.Reply {
 }
 
 func (db *DB) Hlen(key []byte) *skv.Reply {
-	return db._raw_get(_hlen_key(key))
+	return db._raw_get(skv.HashLenKey(key))
 }

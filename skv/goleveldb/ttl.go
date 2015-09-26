@@ -17,6 +17,7 @@ package goleveldb
 import (
 	"time"
 
+	"github.com/lessos/lessdb/skv"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
@@ -26,25 +27,25 @@ func (db *DB) ttl_worker() {
 
 		for {
 
-			ls := db.Zrange(ns_set_ttl, 0, timeNowMS(), ttl_job_limit).Hash()
+			ls := db.Zrange(skv.SetTtlPrefix(), 0, skv.TimeNowMS(), skv.TtlJobLimit).Hash()
 
 			for _, v := range ls {
 
 				batch := new(leveldb.Batch)
 
-				batch.Delete(_zscore_key(ns_set_ttl, v.Key, v.Uint64()))
+				batch.Delete(skv.ZsetScoreKey(skv.SetTtlPrefix(), v.Key, v.Uint64()))
 
-				if rs := db.Zget(ns_set_ttl, v.Key).Uint64(); rs == v.Uint64() {
-					batch.Delete(_zset_key(ns_set_ttl, v.Key))
+				if rs := db.Zget(skv.SetTtlPrefix(), v.Key).Uint64(); rs == v.Uint64() {
+					batch.Delete(skv.ZsetKey(skv.SetTtlPrefix(), v.Key))
 					batch.Delete(v.Key)
 				}
 
 				db.ldb.Write(batch, nil)
-				db._raw_incrby(_zlen_key(ns_set_ttl), -1)
+				db._raw_incrby(skv.ZsetLenKey(skv.SetTtlPrefix()), -1)
 			}
 
-			if uint64(len(ls)) < ttl_job_limit {
-				time.Sleep(ttl_job_sleep)
+			if uint64(len(ls)) < skv.TtlJobLimit {
+				time.Sleep(skv.TtlJobSleep)
 			}
 		}
 	}()

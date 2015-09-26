@@ -12,41 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package leveldb
+package skv
 
-import (
-	"bytes"
-	"encoding/json"
-	"errors"
-	"time"
-)
+func HashKeyPrefix(key []byte) []byte {
 
-func timeNowMS() uint64 {
-	return uint64(time.Now().UTC().UnixNano() / 1e6)
+	si := len(key)
+	if si > 255 {
+		si = 255
+	}
+
+	return append([]byte{ns_hash_entry, uint8(si)}, key...)
 }
 
-func bytesClone(src []byte) []byte {
-
-	dst := make([]byte, len(src))
-	copy(dst, src)
-
-	return dst
+func HashKey(key, field []byte) []byte {
+	return append(HashKeyPrefix(key), field...)
 }
 
-func jsonDecode(src []byte, js interface{}) (err error) {
+func HashLenKey(key []byte) []byte {
 
-	defer func() {
-		if r := recover(); r != nil {
-			err = errors.New("json: invalid format")
-		}
-	}()
+	si := len(key)
+	if si > 255 {
+		si = 255
+	}
 
-	d := json.NewDecoder(bytes.NewBuffer(src))
-	d.UseNumber()
-
-	return d.Decode(&js)
-}
-
-func jsonEncode(js interface{}) ([]byte, error) {
-	return json.Marshal(js)
+	return append([]byte{ns_hash_len, uint8(si)}, key...)
 }

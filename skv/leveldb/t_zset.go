@@ -23,28 +23,8 @@ import (
 	"github.com/lessos/lessdb/skv"
 )
 
-func _zset_key(key, member []byte) []byte {
-	return append(_raw_key_encode(ns_zset_entry, key), member...)
-}
-
-func _zscore_key_prefix(key []byte, score uint64) []byte {
-
-	bscore := make([]byte, 8)
-	binary.BigEndian.PutUint64(bscore, score)
-
-	return append(_raw_key_encode(ns_zset_score, key), bscore...)
-}
-
-func _zscore_key(key, member []byte, score uint64) []byte {
-	return append(_zscore_key_prefix(key, score), member...)
-}
-
-func _zlen_key(key []byte) []byte {
-	return _raw_key_encode(ns_zset_length, key)
-}
-
 func (db *DB) Zget(key, member []byte) *skv.Reply {
-	return db._raw_get(_zset_key(key, member))
+	return db._raw_get(skv.ZsetKey(key, member))
 }
 
 func (db *DB) Zset(key, member []byte, score uint64) *skv.Reply {
@@ -58,17 +38,17 @@ func (db *DB) Zset(key, member []byte, score uint64) *skv.Reply {
 	//
 	if prev := db.Zget(key, member); prev.Status == skv.ReplyOK && prev.Uint64() != score {
 
-		wb.Delete(_zscore_key(key, member, prev.Uint64()))
+		wb.Delete(skv.ZsetScoreKey(key, member, prev.Uint64()))
 
 	} else if prev.Status == skv.ReplyNotFound {
-		db._raw_incrby(_zlen_key(key), 1)
+		db._raw_incrby(skv.ZsetLenKey(key), 1)
 	}
 
 	//
-	wb.Put(_zscore_key(key, member, score), []byte{})
+	wb.Put(skv.ZsetScoreKey(key, member, score), []byte{})
 
 	//
-	wb.Put(_zset_key(key, member), []byte(strconv.FormatUint(score, 10)))
+	wb.Put(skv.ZsetKey(key, member), []byte(strconv.FormatUint(score, 10)))
 
 	rpl := skv.NewReply("")
 
@@ -82,8 +62,8 @@ func (db *DB) Zset(key, member []byte, score uint64) *skv.Reply {
 func (db *DB) Zrange(key []byte, score_start, score_end, limit uint64) *skv.Reply {
 
 	var (
-		bs_start = _zscore_key_prefix(key, score_start)
-		bs_end   = _zscore_key_prefix(key, score_end)
+		bs_start = skv.ZsetScoreKeyPrefix(key, score_start)
+		bs_end   = skv.ZsetScoreKeyPrefix(key, score_end)
 		rpl      = skv.NewReply("")
 	)
 
@@ -115,8 +95,8 @@ func (db *DB) Zrange(key []byte, score_start, score_end, limit uint64) *skv.Repl
 
 		ui64 := binary.BigEndian.Uint64(it.Key()[len(key)+2 : (len(key) + 10)])
 
-		rpl.Data = append(rpl.Data, bytesClone(it.Key()[(len(key)+10):]))
-		rpl.Data = append(rpl.Data, bytesClone([]byte(strconv.FormatUint(ui64, 10))))
+		rpl.Data = append(rpl.Data, skv.BytesClone(it.Key()[(len(key)+10):]))
+		rpl.Data = append(rpl.Data, skv.BytesClone([]byte(strconv.FormatUint(ui64, 10))))
 
 		limit--
 	}
@@ -136,11 +116,11 @@ func (db *DB) Zdel(key, member []byte) *skv.Reply {
 	// wo := levigo.NewWriteOptions()
 	// defer wo.Close()
 
-	wb.Delete(_zset_key(key, member))
+	wb.Delete(skv.ZsetKey(key, member))
 
 	if prev := db.Zget(key, member); prev.Status == skv.ReplyOK {
-		db._raw_incrby(_zlen_key(key), -1)
-		wb.Delete(_zscore_key(key, member, prev.Uint64()))
+		db._raw_incrby(skv.ZsetLenKey(key), -1)
+		wb.Delete(skv.ZsetScoreKey(key, member, prev.Uint64()))
 	}
 
 	rpl := skv.NewReply("")
@@ -153,5 +133,5 @@ func (db *DB) Zdel(key, member []byte) *skv.Reply {
 }
 
 func (db *DB) Zlen(key []byte) *skv.Reply {
-	return db._raw_get(_zlen_key(key))
+	return db._raw_get(skv.ZsetLenKey(key))
 }

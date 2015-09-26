@@ -12,26 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package goleveldb
+package skv
 
-const (
-	ttl_job_sleep            = 300e6
-	ttl_job_limit     uint64 = 10000
-	scan_max_limit    uint64 = 10000
-	ns_zero                  = 0x00
-	ns_set_entry             = 0x80
-	ns_hash_entry            = 0x81
-	ns_hash_len              = 0x82
-	ns_zset_entry            = 0x83
-	ns_zset_score            = 0x84
-	ns_zset_length           = 0x85
-	ns_iset_schema           = 0x86
-	ns_iset_entry            = 0x87
-	ns_iset_index            = 0x88
-	ns_iset_length           = 0x89
-	ns_iset_increment        = 0x90
-)
+func RawKeyEncode(ns byte, key []byte) []byte {
 
-var (
-	ns_set_ttl = []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00}
-)
+	si := len(key)
+	if si > 255 {
+		si = 255
+		key = key[:255]
+	}
+
+	return append([]byte{ns, uint8(si)}, key...)
+}

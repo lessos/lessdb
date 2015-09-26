@@ -28,23 +28,22 @@ import (
 
 var (
 	_iset_global_locker sync.Mutex
-	_iset_indexes       = map[string]IsetSchema{}
 )
 
 type empty struct{}
 
 func (db *DB) Iget(key, prikey []byte) *skv.Reply {
-	return db._raw_get(_iset_entry_key(key, prikey))
+	return db._raw_get(skv.IsetEntryKey(key, prikey))
 }
 
 func (db *DB) Iscan(key, cursor, end []byte, limit uint64) *skv.Reply {
 
-	if limit > scan_max_limit {
-		limit = scan_max_limit
+	if limit > skv.ScanMaxLimit {
+		limit = skv.ScanMaxLimit
 	}
 
 	var (
-		prefix = _iset_entry_key_prefix(key)
+		prefix = skv.IsetEntryKeyPrefix(key)
 		prelen = len(prefix)
 		cstart = append(prefix, cursor...)
 		cend   = append(prefix, end...)
@@ -67,8 +66,8 @@ func (db *DB) Iscan(key, cursor, end []byte, limit uint64) *skv.Reply {
 			continue
 		}
 
-		rpl.Data = append(rpl.Data, bytesClone(iter.Key()[prelen:]))
-		rpl.Data = append(rpl.Data, bytesClone(iter.Value()))
+		rpl.Data = append(rpl.Data, skv.BytesClone(iter.Key()[prelen:]))
+		rpl.Data = append(rpl.Data, skv.BytesClone(iter.Value()))
 
 		limit--
 	}
@@ -85,7 +84,7 @@ func (db *DB) Iscan(key, cursor, end []byte, limit uint64) *skv.Reply {
 // TODO btree
 // 	https://github.com/petar/GoLLRB
 //  https://github.com/google/btree
-func (db *DB) Iquery(key []byte, qry *QuerySet) *skv.Reply {
+func (db *DB) Iquery(key []byte, qry *skv.QuerySet) *skv.Reply {
 
 	rpl := skv.NewReply(skv.ReplyInvalidArgument)
 	skey := string(key)
@@ -95,10 +94,10 @@ func (db *DB) Iquery(key []byte, qry *QuerySet) *skv.Reply {
 		return rpl
 	}
 
-	idxs := map[string]IsetEntry{}
+	idxs := map[string]skv.IsetEntry{}
 	for _, idx := range schema.Indexes {
 
-		if qry.sortField == idx.Column && idx.Type != IsetTypeUint {
+		if qry.SortField == idx.Column && idx.Type != skv.IsetTypeUint {
 			return rpl
 		}
 
@@ -113,39 +112,39 @@ func (db *DB) Iquery(key []byte, qry *QuerySet) *skv.Reply {
 
 	sls := [][]byte{}
 
-	if qry.sortField != "" {
+	if qry.SortField != "" {
 
-		idx, ok := idxs[qry.sortField]
+		idx, ok := idxs[qry.SortField]
 		if !ok {
 			return rpl
 		}
 
-		start, end := _iset_idx_field_prefix(key, idx.Seq), _iset_idx_field_prefix(key, idx.Seq)
+		start, end := skv.IsetIndexFieldPrefix(key, idx.Seq), skv.IsetIndexFieldPrefix(key, idx.Seq)
 
 		rs := []skv.Entry{}
 
 		for {
 
-			if qry.sortMode == QuerySortAttrDesc {
-				rs = db._raw_revscan(start, end, _iset_scan_max).Hash()
+			if qry.SortMode == skv.QuerySortAttrDesc {
+				rs = db._raw_revscan(start, end, skv.IsetScanMax).Hash()
 			} else {
-				rs = db._raw_scan(start, end, _iset_scan_max).Hash()
+				rs = db._raw_scan(start, end, skv.IsetScanMax).Hash()
 			}
 
 			for _, v := range rs {
 
-				if _, bkey, ok := _iset_idx_rawkey_export(v.Key, idx.Length); ok {
-					sls = append(sls, bytesClone(bkey))
+				if _, bkey, ok := skv.IsetIndexRawKeyExport(v.Key, idx.Length); ok {
+					sls = append(sls, skv.BytesClone(bkey))
 				}
 
-				if qry.sortMode == QuerySortAttrDesc {
-					end = _iset_bytes_decr(v.Key)
+				if qry.SortMode == skv.QuerySortAttrDesc {
+					end = skv.IsetBytesDecr(v.Key)
 				} else {
-					start = _iset_bytes_incr(v.Key)
+					start = skv.IsetBytesIncr(v.Key)
 				}
 			}
 
-			if uint64(len(rs)) < _iset_scan_max {
+			if uint64(len(rs)) < skv.IsetScanMax {
 				break
 			}
 		}
@@ -163,7 +162,7 @@ func (db *DB) Iquery(key []byte, qry *QuerySet) *skv.Reply {
 			continue
 		}
 
-		if idx.Type != IsetTypeUint {
+		if idx.Type != skv.IsetTypeUint {
 			continue
 		}
 
@@ -171,7 +170,7 @@ func (db *DB) Iquery(key []byte, qry *QuerySet) *skv.Reply {
 
 		for _, v := range filter.Values {
 
-			vb := _iset_idx_sint_to_bytes(v, idx.Length)
+			vb := skv.IsetIndexSintToBytes(v, idx.Length)
 
 			dup := false
 			for _, pvb := range values {
@@ -186,8 +185,8 @@ func (db *DB) Iquery(key []byte, qry *QuerySet) *skv.Reply {
 
 				values = append(values, vb)
 
-				if (filter.Type == QueryFilterValues && !filter.Exclude) ||
-					filter.Type == QueryFilterRange {
+				if (filter.Type == skv.QueryFilterValues && !filter.Exclude) ||
+					filter.Type == skv.QueryFilterRange {
 
 					if len(vstart) < 1 {
 						vstart = vb
@@ -203,7 +202,7 @@ func (db *DB) Iquery(key []byte, qry *QuerySet) *skv.Reply {
 		}
 
 		var (
-			kpre    = _iset_idx_field_prefix(key, idx.Seq)
+			kpre    = skv.IsetIndexFieldPrefix(key, idx.Seq)
 			start   = append(kpre, vstart...)
 			end     = append(kpre, vend...)
 			fitkeys = map[string]empty{}
@@ -211,25 +210,25 @@ func (db *DB) Iquery(key []byte, qry *QuerySet) *skv.Reply {
 
 		for {
 
-			rs := db._raw_scan(start, end, _iset_scan_max).Hash()
+			rs := db._raw_scan(start, end, skv.IsetScanMax).Hash()
 
 			for _, v := range rs {
 
-				if _, bkey, ok := _iset_idx_rawkey_export(v.Key, idx.Length); ok {
+				if _, bkey, ok := skv.IsetIndexRawKeyExport(v.Key, idx.Length); ok {
 
 					if sls_ok {
 
 						fitkeys[string(bkey)] = empty{}
 
 					} else {
-						sls = append(sls, bkey)
+						sls = append(sls, skv.BytesClone(bkey))
 					}
 				}
 
-				start = _iset_bytes_incr(v.Key)
+				start = skv.IsetBytesIncr(v.Key)
 			}
 
-			if uint64(len(rs)) < _iset_scan_max {
+			if uint64(len(rs)) < skv.IsetScanMax {
 				break
 			}
 		}
@@ -250,16 +249,27 @@ func (db *DB) Iquery(key []byte, qry *QuerySet) *skv.Reply {
 		sls_ok = true
 	}
 
-	if len(sls) <= qry.offset {
+	if !sls_ok {
+
+		// TOPO
+		tls := db.Iscan(key, []byte{}, []byte{}, uint64(qry.Offset+qry.Limit)).Hash()
+		for i := qry.Offset; i < len(tls); i++ {
+			rpl.Data = append(rpl.Data, tls[i].Key, tls[i].Value)
+		}
+
 		return rpl
 	}
 
-	cutoff := qry.offset + qry.limit
+	if len(sls) <= qry.Offset {
+		return rpl
+	}
+
+	cutoff := qry.Offset + qry.Limit
 	if cutoff > len(sls) {
 		cutoff = len(sls)
 	}
 
-	for i := qry.offset; i < cutoff; i++ {
+	for i := qry.Offset; i < cutoff; i++ {
 		if rs := db.Iget(key, sls[i]); rs.Status == "OK" {
 			rpl.Data = append(rpl.Data, sls[i], rs.Bytes())
 		}
@@ -277,27 +287,27 @@ func (db *DB) Iset(key, prikey []byte, obj interface{}) *skv.Reply {
 
 	rpl := skv.NewReply("")
 
-	if len(key) > _iset_keylen_max ||
-		len(prikey) > _iset_prilen_max ||
+	if len(key) > skv.IsetKeyLenMax ||
+		len(prikey) > skv.IsetPriLenMax ||
 		obj == nil {
 		rpl.Status = skv.ReplyInvalidArgument
 		return rpl
 	}
 
 	var (
-		bkey     = _iset_entry_key(key, prikey)
+		bkey     = skv.IsetEntryKey(key, prikey)
 		objt     = reflect.TypeOf(obj)
 		objv     = reflect.ValueOf(obj)
 		set      = map[string]interface{}{}
 		prev     = map[string]interface{}{}
-		previdx  = map[uint8]IsetEntryBytes{}
+		previdx  = map[uint8]skv.IsetEntryBytes{}
 		len_incr = false
 	)
 
 	if rs := db._raw_get(bkey); rs.Status == skv.ReplyOK {
 
 		if err := rs.JsonDecode(&prev); err == nil {
-			previdx = _iset_idx_data_export(key, prev)
+			previdx = skv.IsetIndexDataExport(_iset_indexes, key, prev)
 		}
 
 	} else if rs.Status == skv.ReplyNotFound {
@@ -307,7 +317,7 @@ func (db *DB) Iset(key, prikey []byte, obj interface{}) *skv.Reply {
 	if objt.Kind() == reflect.Struct {
 
 		for i := 0; i < objt.NumField(); i++ {
-			set[_iset_idx_string_filter(objt.Field(i).Name)] = objv.Field(i).Interface()
+			set[skv.IsetIndexStringFilter(objt.Field(i).Name)] = objv.Field(i).Interface()
 		}
 
 	} else if objt.Kind() == reflect.Map {
@@ -317,7 +327,7 @@ func (db *DB) Iset(key, prikey []byte, obj interface{}) *skv.Reply {
 		for _, mkv := range mks {
 
 			if mkv.Kind() == reflect.String {
-				set[_iset_idx_string_filter(mkv.String())] = objv.MapIndex(mkv).Interface()
+				set[skv.IsetIndexStringFilter(mkv.String())] = objv.MapIndex(mkv).Interface()
 			}
 		}
 
@@ -327,7 +337,7 @@ func (db *DB) Iset(key, prikey []byte, obj interface{}) *skv.Reply {
 		return rpl
 	}
 
-	setidx, idxnew, idxdup := _iset_idx_data_export(key, set), [][]byte{}, [][]byte{}
+	setidx, idxnew, idxdup := skv.IsetIndexDataExport(_iset_indexes, key, set), [][]byte{}, [][]byte{}
 
 	// fmt.Println("\tsetidx", setidx)
 	// fmt.Println("\tprevidx", previdx)
@@ -337,7 +347,7 @@ func (db *DB) Iset(key, prikey []byte, obj interface{}) *skv.Reply {
 		var incr_set, incr_prev uint64
 
 		if siEntry.AutoIncr {
-			incr_set = _iset_bytes_to_uint64(siEntry.Data)
+			incr_set = skv.IsetBytesToUint64(siEntry.Data)
 		}
 
 		//
@@ -345,7 +355,7 @@ func (db *DB) Iset(key, prikey []byte, obj interface{}) *skv.Reply {
 
 			if siEntry.AutoIncr && incr_set == 0 {
 
-				if incr_prev = _iset_bytes_to_uint64(piEntry.Data); incr_prev > 0 {
+				if incr_prev = skv.IsetBytesToUint64(piEntry.Data); incr_prev > 0 {
 
 					siEntry.Data, incr_set = piEntry.Data, incr_prev
 
@@ -358,7 +368,7 @@ func (db *DB) Iset(key, prikey []byte, obj interface{}) *skv.Reply {
 				continue
 			}
 
-			idxdup = append(idxdup, append(append(_iset_idx_field_prefix(key, siKey), piEntry.Data...), prikey...))
+			idxdup = append(idxdup, append(append(skv.IsetIndexFieldPrefix(key, siKey), piEntry.Data...), prikey...))
 		}
 
 		//
@@ -366,7 +376,7 @@ func (db *DB) Iset(key, prikey []byte, obj interface{}) *skv.Reply {
 
 			if incr_set == 0 {
 
-				incr_set = db._raw_incrby(_iset_idx_increment_key(key, siEntry.Seq), 1).Uint64()
+				incr_set = db._raw_incrby(skv.IsetIndexIncrKey(key, siEntry.Seq), 1).Uint64()
 
 				ibs := make([]byte, 8)
 				binary.BigEndian.PutUint64(ibs, incr_set)
@@ -377,15 +387,15 @@ func (db *DB) Iset(key, prikey []byte, obj interface{}) *skv.Reply {
 
 			} else if incr_set > 0 && incr_set > incr_prev {
 
-				if db._raw_get(_iset_idx_increment_key(key, siEntry.Seq)).Uint64() < incr_set {
-					db._raw_set(_iset_idx_increment_key(key, siEntry.Seq), []byte(strconv.FormatUint(incr_set, 10)), 0)
+				if db._raw_get(skv.IsetIndexIncrKey(key, siEntry.Seq)).Uint64() < incr_set {
+					db._raw_set(skv.IsetIndexIncrKey(key, siEntry.Seq), []byte(strconv.FormatUint(incr_set, 10)), 0)
 				}
 			}
 		}
 
 		if siEntry.Unique || siEntry.AutoIncr {
 
-			objIdxKeyPrefix := append(_iset_idx_field_prefix(key, siKey), siEntry.Data...)
+			objIdxKeyPrefix := append(skv.IsetIndexFieldPrefix(key, siKey), siEntry.Data...)
 
 			if rs := db._raw_scan(objIdxKeyPrefix, []byte{}, 1).Hash(); len(rs) > 0 {
 				rpl.Status = skv.ReplyInvalidArgument
@@ -393,7 +403,7 @@ func (db *DB) Iset(key, prikey []byte, obj interface{}) *skv.Reply {
 			}
 		}
 
-		idxnew = append(idxnew, append(append(_iset_idx_field_prefix(key, siKey), siEntry.Data...), prikey...))
+		idxnew = append(idxnew, append(append(skv.IsetIndexFieldPrefix(key, siKey), siEntry.Data...), prikey...))
 	}
 
 	//
@@ -407,13 +417,13 @@ func (db *DB) Iset(key, prikey []byte, obj interface{}) *skv.Reply {
 		batch.Put(idxkey, []byte{})
 	}
 
-	bvalue, _ := jsonEncode(set)
+	bvalue, _ := skv.JsonEncode(set)
 	batch.Put(bkey, bvalue)
 
 	if err := db.ldb.Write(batch, nil); err != nil {
 		rpl.Status = err.Error()
 	} else if len_incr {
-		db._raw_incrby(_iset_len_key(key), 1)
+		db._raw_incrby(skv.IsetLenKey(key), 1)
 	}
 
 	return rpl
@@ -426,8 +436,8 @@ func (db *DB) Idel(key, prikey []byte) *skv.Reply {
 
 	var (
 		rpl     = skv.NewReply("")
-		bkey    = _iset_entry_key(key, prikey)
-		previdx = map[uint8]IsetEntryBytes{}
+		bkey    = skv.IsetEntryKey(key, prikey)
+		previdx = map[uint8]skv.IsetEntryBytes{}
 	)
 
 	if rs := db._raw_get(bkey); rs.Status == skv.ReplyNotFound {
@@ -440,19 +450,19 @@ func (db *DB) Idel(key, prikey []byte) *skv.Reply {
 
 	} else {
 
-		db._raw_incrby(_iset_len_key(key), -1)
+		db._raw_incrby(skv.IsetLenKey(key), -1)
 
 		var prev map[string]interface{}
 
 		if err := rs.JsonDecode(&prev); err == nil {
-			previdx = _iset_idx_data_export(key, prev)
+			previdx = skv.IsetIndexDataExport(_iset_indexes, key, prev)
 		}
 	}
 
 	batch := new(leveldb.Batch)
 
 	for piKey, piEntry := range previdx {
-		batch.Delete(append(append(_iset_idx_field_prefix(key, piKey), piEntry.Data...), prikey...))
+		batch.Delete(append(append(skv.IsetIndexFieldPrefix(key, piKey), piEntry.Data...), prikey...))
 	}
 
 	batch.Delete(bkey)
@@ -465,5 +475,5 @@ func (db *DB) Idel(key, prikey []byte) *skv.Reply {
 }
 
 func (db *DB) Ilen(key []byte) *skv.Reply {
-	return db._raw_get(_iset_len_key(key))
+	return db._raw_get(skv.IsetLenKey(key))
 }
