@@ -27,7 +27,7 @@ func (db *DB) ttl_worker() {
 
 		for {
 
-			ls := db.Zrange(skv.SetTtlPrefix(), 0, skv.TimeNowMS(), skv.TtlJobLimit).Hash()
+			ls := db.Zrange(skv.SetTtlPrefix(), 0, skv.TimeNowMS(), skv.TtlWorkerLimit).Hash()
 
 			for _, v := range ls {
 
@@ -48,8 +48,8 @@ func (db *DB) ttl_worker() {
 				db._raw_incrby(skv.ZsetLenKey(skv.SetTtlPrefix()), -1)
 			}
 
-			if uint64(len(ls)) < skv.TtlJobLimit {
-				time.Sleep(skv.TtlJobSleep)
+			if uint64(len(ls)) < skv.TtlWorkerLimit {
+				time.Sleep(skv.TtlWorkerSleep)
 			}
 		}
 	}()

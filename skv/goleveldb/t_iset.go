@@ -112,12 +112,7 @@ func (db *DB) Iquery(key []byte, qry *skv.QuerySet) *skv.Reply {
 
 	sls := [][]byte{}
 
-	if qry.SortField != "" {
-
-		idx, ok := idxs[qry.SortField]
-		if !ok {
-			return rpl
-		}
+	if idx, ok := idxs[qry.SortField]; ok {
 
 		start, end := skv.IsetIndexFieldPrefix(key, idx.Seq), skv.IsetIndexFieldPrefix(key, idx.Seq)
 
@@ -298,9 +293,9 @@ func (db *DB) Iset(key, prikey []byte, obj interface{}) *skv.Reply {
 		bkey     = skv.IsetEntryKey(key, prikey)
 		objt     = reflect.TypeOf(obj)
 		objv     = reflect.ValueOf(obj)
-		set      = map[string]interface{}{}
 		prev     = map[string]interface{}{}
 		previdx  = map[uint8]skv.IsetEntryBytes{}
+		set      = map[string]interface{}{}
 		len_incr = false
 	)
 

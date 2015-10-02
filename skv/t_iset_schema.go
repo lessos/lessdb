@@ -19,18 +19,18 @@ import (
 )
 
 const (
+	//
 	IsetTypeBinary    uint8 = 0
 	IsetTypeUint      uint8 = 1
 	IsetTypeString    uint8 = 2
 	IsetTypeHexString uint8 = 3
-)
 
-const (
+	//
 	IsetKeyLenMax             = 16
 	IsetPriLenMax             = 16
 	IsetSchemaMaxIndex        = 20
-	_iset_indexing            = false
 	IsetScanMax        uint64 = 10000
+	_iset_indexing            = false
 )
 
 type IsetSchema struct {

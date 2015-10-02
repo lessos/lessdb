@@ -14,6 +14,10 @@
 
 package skv
 
+func RawTtlPrefix() []byte {
+	return []byte{ns_raw_ttl}
+}
+
 func RawKeyEncode(ns byte, key []byte) []byte {
 
 	si := len(key)

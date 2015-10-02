@@ -175,6 +175,10 @@ func (db *DB) _raw_ttl(key []byte) *skv.Reply {
 
 func (db *DB) _raw_incrby(key []byte, step int64) *skv.Reply {
 
+	if step == 0 {
+		return skv.NewReply("")
+	}
+
 	_raw_incr_locker.Lock()
 	defer _raw_incr_locker.Unlock()
 

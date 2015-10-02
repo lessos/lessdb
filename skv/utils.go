@@ -18,11 +18,27 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"strconv"
 	"time"
+)
+
+const (
+	MetaTimeStd = "20060102150405.000"
 )
 
 func TimeNowMS() uint64 {
 	return uint64(time.Now().UTC().UnixNano() / 1e6)
+}
+
+func MetaTimeNow() uint64 {
+
+	t := time.Now().UTC().Format(MetaTimeStd)
+
+	if u64, err := strconv.ParseUint(t[:14]+t[15:], 10, 64); err == nil {
+		return u64
+	}
+
+	return 0
 }
 
 func BytesClone(src []byte) []byte {

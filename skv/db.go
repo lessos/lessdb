@@ -15,27 +15,37 @@
 package skv
 
 const (
+	//
 	KiB = 1024
 	MiB = KiB * 1024
 	GiB = MiB * 1024
-)
 
-const (
-	TtlJobSleep              = 300e6
-	TtlJobLimit       uint64 = 10000
-	ScanMaxLimit      uint64 = 10000
-	ns_zero                  = 0x00
-	ns_set_entry             = 0x80
-	ns_hash_entry            = 0x81
-	ns_hash_len              = 0x82
-	ns_zset_entry            = 0x83
-	ns_zset_score            = 0x84
-	ns_zset_length           = 0x85
-	ns_iset_schema           = 0x86
-	ns_iset_entry            = 0x87
-	ns_iset_index            = 0x88
-	ns_iset_length           = 0x89
-	ns_iset_increment        = 0x90
+	//
+	TtlWorkerSleep        = 300e6
+	TtlWorkerLimit uint64 = 10000
+	ScanMaxLimit   uint64 = 10000
+
+	//
+	ObjectMetaBytes     = 0x00
+	ObjectMetaJson      = 0x01
+	ObjectMetaIndexJson = 0x02
+
+	//
+	ns_zero           = 0x00
+	ns_raw_ttl        = 0x79
+	ns_set_entry      = 0x80
+	ns_hash_entry     = 0x81
+	ns_hash_len       = 0x82
+	ns_zset_entry     = 0x83
+	ns_zset_score     = 0x84
+	ns_zset_length    = 0x85
+	ns_iset_schema    = 0x86
+	ns_iset_entry     = 0x87
+	ns_iset_index     = 0x88
+	ns_iset_length    = 0x89
+	ns_iset_increment = 0x90
+	ns_object_meta    = 0xa0
+	ns_object_entry   = 0xa1
 )
 
 var (
@@ -70,7 +80,8 @@ type DB interface {
 	Zrange(key []byte, score_start, score_end, limit uint64) *Reply
 	Zlen(key []byte) *Reply
 
-	// Indexed Key Value APIs
+	// Indexed Key JSON APIs
+	IschemaSet(key []byte, schema IsetSchema) *Reply
 	Iget(key, prikey []byte) *Reply
 	Iset(key, prikey []byte, obj interface{}) *Reply
 	Idel(key, prikey []byte) *Reply

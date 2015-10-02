@@ -142,6 +142,17 @@ func (db *DB) _raw_set(key, value []byte, ttl uint64) *skv.Reply {
 	return rpl
 }
 
+func (db *DB) _raw_set_ttl(key []byte, ttl uint32) bool {
+
+	if ttl > 1000 {
+		if r := db.Zset(skv.RawTtlPrefix(), key, skv.TimeNowMS()+uint64(ttl)); r.Status != skv.ReplyOK {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (db *DB) _raw_ttl(key []byte) *skv.Reply {
 
 	ttl := db.Zget(skv.SetTtlPrefix(), key).Int64() - int64(skv.TimeNowMS())
@@ -157,6 +168,10 @@ func (db *DB) _raw_ttl(key []byte) *skv.Reply {
 }
 
 func (db *DB) _raw_incrby(key []byte, step int64) *skv.Reply {
+
+	if step == 0 {
+		return skv.NewReply("")
+	}
 
 	_raw_incr_locker.Lock()
 	defer _raw_incr_locker.Unlock()
