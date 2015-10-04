@@ -31,7 +31,7 @@ func (db *DB) ObjectGet(path string) *skv.Reply {
 	return db._raw_get(skv.ObjectEntryIndex(path))
 }
 
-func (db *DB) ObjectSet(path string, value []byte, ttl uint64) *skv.Reply {
+func (db *DB) ObjectSet(path string, value []byte, ttl uint32) *skv.Reply {
 
 	bkey := skv.ObjectEntryIndex(path)
 
@@ -44,7 +44,7 @@ func (db *DB) ObjectSet(path string, value []byte, ttl uint64) *skv.Reply {
 		prev_size = int64(len(value) - len(rs.Bytes()))
 	}
 
-	db._obj_meta_sync(path, 0, prev_num, prev_size, int64(len(value)))
+	db._obj_meta_sync(path, 0, prev_num, prev_size, int64(len(value)), ttl)
 
 	return db._raw_set(bkey, value, 0)
 }
@@ -56,16 +56,16 @@ func (db *DB) ObjectDel(path string) *skv.Reply {
 
 	if rs := db._raw_get(bkey); rs.Status == skv.ReplyOK {
 		rpl = db._raw_del(bkey)
-		db._obj_meta_sync(path, 0, -1, int64(-len(rs.Bytes())), 0)
+		db._obj_meta_sync(path, 0, -1, int64(-len(rs.Bytes())), 0, 0)
 	}
 
 	return rpl
 }
 
-func (db *DB) ObjectScan(path, cursor, end string, limit uint64) *skv.Reply {
+func (db *DB) ObjectScan(path, cursor, end string, limit uint32) *skv.Reply {
 
-	if limit > skv.ScanMaxLimit {
-		limit = skv.ScanMaxLimit
+	if limit > uint32(skv.ScanMaxLimit) {
+		limit = uint32(skv.ScanMaxLimit)
 	}
 
 	var (
@@ -164,7 +164,7 @@ func (db *DB) ObjectMetaScan(path, cursor, end string, limit uint64) *skv.ReplyO
 	return rpl
 }
 
-func (db *DB) _obj_meta_sync(path string, otype uint8, pnum int32, psize, size int64) string {
+func (db *DB) _obj_meta_sync(path string, otype uint8, pnum int32, psize, size int64, ttl uint32) string {
 
 	cpath, fold, field, _, _ := skv.ObjectPathSplit(path)
 
@@ -190,11 +190,6 @@ func (db *DB) _obj_meta_sync(path string, otype uint8, pnum int32, psize, size i
 		meta.Updated = skv.MetaTimeNow()
 
 		meta.Name = field
-
-		//
-		// db._raw_set(skv.ObjectMetaIndex(cpath), meta.Export(), 0)
-	} else {
-		// db._raw_del(skv.ObjectMetaIndex(cpath))
 	}
 
 	_obj_meta_locker.Lock()
@@ -234,17 +229,17 @@ func (db *DB) _obj_meta_sync(path string, otype uint8, pnum int32, psize, size i
 		pmeta.Name = fold
 	}
 
-	// if pmeta.Len < 1 {
-	// 	db._raw_del(skv.ObjectMetaIndex(fold))
-	// } else {
-	// 	db._raw_set(skv.ObjectMetaIndex(fold), pmeta.Export(), 0)
-	// }
-
 	//
 	batch := new(leveldb.Batch)
 
 	if size > 0 {
+
+		if ok := db._raw_set_ttl(skv.NsObjectEntry, []byte(path), ttl); !ok {
+			return "ServerError TTL Set"
+		}
+
 		batch.Put(skv.ObjectMetaIndex(cpath), meta.Export())
+
 	} else {
 		batch.Delete(skv.ObjectMetaIndex(cpath))
 	}

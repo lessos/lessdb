@@ -72,7 +72,7 @@ func _obj_entry_key_prefix(key []byte) []byte {
 		si = 255
 	}
 
-	return append([]byte{ns_object_entry, uint8(si)}, key[:si]...)
+	return append([]byte{NsObjectEntry, uint8(si)}, key[:si]...)
 }
 
 func _obj_entry_meta_prefix(key []byte) []byte {
@@ -147,10 +147,10 @@ func ObjectMetaFold(path string) []byte {
 type ObjectInterface interface {
 	//
 	ObjectGet(path string) *Reply
-	ObjectSet(path string, value []byte, ttl uint64) *Reply
+	ObjectSet(path string, value []byte, ttl uint32) *Reply
 	// ObjectSetJson(path string, value interface{}, ttl uint64) *Reply
 	ObjectDel(path string) *Reply
-	ObjectScan(path, cursor, end string, limit uint64) *Reply
+	ObjectScan(path, cursor, end string, limit uint32) *Reply
 	// ObjectSchemaSync(key []byte, schema IsetSchema) *Reply
 	// ObjectQuery(key []byte, qry *QuerySet) *Reply
 	ObjectMetaGet(path string) *ReplyObjectMeta

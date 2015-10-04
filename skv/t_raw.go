@@ -14,9 +14,9 @@
 
 package skv
 
-func RawTtlPrefix() []byte {
-	return []byte{ns_raw_ttl}
-}
+import (
+	"encoding/binary"
+)
 
 func RawKeyEncode(ns byte, key []byte) []byte {
 
@@ -27,4 +27,24 @@ func RawKeyEncode(ns byte, key []byte) []byte {
 	}
 
 	return append([]byte{ns, uint8(si)}, key...)
+}
+
+func RawTtlEntry(key []byte) []byte {
+	return RawKeyEncode(NsRawTtlEntry, key)
+}
+
+func RawTtlQueuePrefix(ttl uint64) []byte {
+
+	bscore := make([]byte, 8)
+	binary.BigEndian.PutUint64(bscore, ttl)
+
+	return append([]byte{NsRawTtlQueue}, bscore...)
+}
+
+func RawTtlQueue(key []byte, ttl uint64) []byte {
+
+	bscore := make([]byte, 8)
+	binary.BigEndian.PutUint64(bscore, ttl)
+
+	return append(append([]byte{NsRawTtlQueue}, bscore...), key...)
 }

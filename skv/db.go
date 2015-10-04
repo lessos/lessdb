@@ -32,7 +32,8 @@ const (
 
 	//
 	ns_zero           = 0x00
-	ns_raw_ttl        = 0x79
+	NsRawTtlEntry     = 0x70
+	NsRawTtlQueue     = 0x71
 	ns_set_entry      = 0x80
 	ns_hash_entry     = 0x81
 	ns_hash_len       = 0x82
@@ -45,7 +46,7 @@ const (
 	ns_iset_length    = 0x89
 	ns_iset_increment = 0x90
 	ns_object_meta    = 0xa0
-	ns_object_entry   = 0xa1
+	NsObjectEntry     = 0xa1
 )
 
 var (

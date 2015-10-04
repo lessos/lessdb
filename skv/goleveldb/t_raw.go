@@ -15,6 +15,7 @@
 package goleveldb
 
 import (
+	"encoding/binary"
 	"strconv"
 	"sync"
 
@@ -142,15 +143,80 @@ func (db *DB) _raw_set(key, value []byte, ttl uint64) *skv.Reply {
 	return rpl
 }
 
-func (db *DB) _raw_set_ttl(key []byte, ttl uint32) bool {
+func (db *DB) _raw_set_ttl(ns byte, key []byte, ttl uint32) bool {
+
+	if len(key) > 200 {
+		return false
+	}
+
+	key = append([]byte{ns}, key...)
 
 	if ttl > 1000 {
-		if r := db.Zset(skv.RawTtlPrefix(), key, skv.TimeNowMS()+uint64(ttl)); r.Status != skv.ReplyOK {
+
+		tto := skv.TimeNowMS() + uint64(ttl)
+
+		batch := new(leveldb.Batch)
+
+		//
+		if prev := db._raw_get(skv.RawTtlEntry(key)); prev.Status == skv.ReplyOK && prev.Uint64() != tto {
+
+			batch.Delete(skv.RawTtlQueue(key, prev.Uint64()))
+		}
+
+		//
+		batch.Put(skv.RawTtlQueue(key, tto), []byte{})
+
+		//
+		batch.Put(skv.RawTtlEntry(key), []byte(strconv.FormatUint(tto, 10)))
+
+		if err := db.ldb.Write(batch, nil); err != nil {
 			return false
 		}
 	}
 
 	return true
+}
+
+func (db *DB) _raw_ttl_range(score_start, score_end, limit uint64) *skv.Reply {
+
+	var (
+		bs_start = skv.RawTtlQueuePrefix(score_start)
+		bs_end   = skv.RawTtlQueuePrefix(score_end)
+		rpl      = skv.NewReply("")
+	)
+
+	for i := len(bs_end); i < 256; i++ {
+		bs_end = append(bs_end, 0xff)
+	}
+
+	iter := db.ldb.NewIterator(&util.Range{Start: bs_start, Limit: bs_end}, nil)
+
+	for iter.Next() {
+
+		if limit < 1 {
+			break
+		}
+
+		if len(iter.Key()) < 10 {
+			db._raw_del(iter.Key())
+			continue
+		}
+
+		ui64 := binary.BigEndian.Uint64(iter.Key()[1:9])
+
+		rpl.Data = append(rpl.Data, skv.BytesClone(iter.Key()))
+		rpl.Data = append(rpl.Data, skv.BytesClone([]byte(strconv.FormatUint(ui64, 10))))
+
+		limit--
+	}
+
+	iter.Release()
+
+	if iter.Error() != nil {
+		rpl.Status = iter.Error().Error()
+	}
+
+	return rpl
 }
 
 func (db *DB) _raw_ttl(key []byte) *skv.Reply {

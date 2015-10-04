@@ -23,6 +23,7 @@ import (
 
 func (db *DB) ttl_worker() {
 
+	// ttl v1
 	go func() {
 
 		for {
@@ -42,6 +43,38 @@ func (db *DB) ttl_worker() {
 
 				db.ldb.Write(batch, nil)
 				db._raw_incrby(skv.ZsetLenKey(skv.SetTtlPrefix()), -1)
+			}
+
+			if uint64(len(ls)) < skv.TtlWorkerLimit {
+				time.Sleep(skv.TtlWorkerSleep)
+			}
+		}
+	}()
+
+	// ttl v2
+	go func() {
+
+		for {
+
+			ls := db._raw_ttl_range(0, skv.TimeNowMS(), skv.TtlWorkerLimit).Hash()
+
+			for _, v := range ls {
+
+				batch := new(leveldb.Batch)
+
+				if db._raw_get(skv.RawTtlEntry(v.Key[9:])).Uint64() == v.Uint64() {
+
+					batch.Delete(skv.RawTtlEntry(v.Key[9:]))
+
+					switch v.Key[9] {
+					case skv.NsObjectEntry:
+						db.ObjectDel(string(v.Key[10:]))
+					}
+				}
+
+				batch.Delete(v.Key)
+
+				db.ldb.Write(batch, nil)
 			}
 
 			if uint64(len(ls)) < skv.TtlWorkerLimit {
