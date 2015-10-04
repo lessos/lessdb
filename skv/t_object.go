@@ -33,6 +33,28 @@ const (
 	obj_type_index = 0x02
 )
 
+const (
+	ObjectEventCreated = 0x01
+	ObjectEventUpdated = 0x02
+	ObjectEventDeleted = 0x03
+)
+
+type ObjectEventHandler func(string, uint64, uint16)
+
+type ObjectInterface interface {
+	ObjectEventRegister(ev ObjectEventHandler)
+	//
+	ObjectGet(path string) *Reply
+	ObjectSet(path string, value []byte, ttl uint32) *Reply
+	// ObjectSetJson(path string, value interface{}, ttl uint64) *Reply
+	ObjectDel(path string) *Reply
+	ObjectScan(path, cursor, end string, limit uint32) *Reply
+	// ObjectSchemaSync(key []byte, schema IsetSchema) *Reply
+	// ObjectQuery(key []byte, qry *QuerySet) *Reply
+	ObjectMetaGet(path string) *ReplyObjectMeta
+	ObjectMetaScan(path, cursor, end string, limit uint64) *ReplyObjectMetaList
+}
+
 func _obj_clean_path(path string) string {
 	return strings.Trim(filepath.Clean(path), "/")
 }
@@ -127,34 +149,6 @@ func ObjectMetaIndex(path string) []byte {
 
 func ObjectMetaFold(path string) []byte {
 	return _obj_entry_meta_prefix(_obj_str_hash(_obj_clean_path(path), obj_fold_len))
-}
-
-// func ObjectMetaFoldParent(path string) []byte {
-
-// 	path = _obj_clean_path(path)
-
-// 	if i := strings.LastIndex(path, "/"); i > 0 {
-// 		path = path[:i]
-// 	} else {
-// 		path = ""
-// 	}
-
-// 	_, _, _, fold, field := ObjectPathSplit(path)
-
-// 	return append(_obj_entry_meta_prefix(fold), field...)
-// }
-
-type ObjectInterface interface {
-	//
-	ObjectGet(path string) *Reply
-	ObjectSet(path string, value []byte, ttl uint32) *Reply
-	// ObjectSetJson(path string, value interface{}, ttl uint64) *Reply
-	ObjectDel(path string) *Reply
-	ObjectScan(path, cursor, end string, limit uint32) *Reply
-	// ObjectSchemaSync(key []byte, schema IsetSchema) *Reply
-	// ObjectQuery(key []byte, qry *QuerySet) *Reply
-	ObjectMetaGet(path string) *ReplyObjectMeta
-	ObjectMetaScan(path, cursor, end string, limit uint64) *ReplyObjectMetaList
 }
 
 type ReplyObjectMeta struct {

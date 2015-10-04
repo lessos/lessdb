@@ -24,8 +24,17 @@ import (
 )
 
 var (
-	_obj_meta_locker sync.Mutex
+	_obj_meta_locker   sync.Mutex
+	_obj_event_handler skv.ObjectEventHandler
 )
+
+func (db *DB) ObjectEventRegister(ev skv.ObjectEventHandler) {
+
+	_obj_meta_locker.Lock()
+	defer _obj_meta_locker.Unlock()
+
+	_obj_event_handler = ev
+}
 
 func (db *DB) ObjectGet(path string) *skv.Reply {
 	return db._raw_get(skv.ObjectEntryIndex(path))
@@ -57,6 +66,10 @@ func (db *DB) ObjectDel(path string) *skv.Reply {
 	if rs := db._raw_get(bkey); rs.Status == skv.ReplyOK {
 		rpl = db._raw_del(bkey)
 		db._obj_meta_sync(path, 0, -1, int64(-len(rs.Bytes())), 0, 0)
+
+		if _obj_event_handler != nil {
+			_obj_event_handler(path, 0, skv.ObjectEventDeleted)
+		}
 	}
 
 	return rpl
