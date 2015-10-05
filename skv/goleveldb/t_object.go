@@ -15,6 +15,8 @@
 package goleveldb
 
 import (
+	// "strconv"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -40,32 +42,63 @@ func (db *DB) ObjectGet(path string) *skv.Reply {
 	return db._raw_get(skv.ObjectEntryIndex(path))
 }
 
-func (db *DB) ObjectSet(path string, value []byte, ttl uint32) *skv.Reply {
+func (db *DB) ObjectSet(path string, value interface{}, ttl uint32) *skv.Reply {
 
-	bkey := skv.ObjectEntryIndex(path)
+	var (
+		meta   skv.ObjectMeta
+		bkey   = skv.ObjectEntryIndex(path)
+		mkey   = skv.ObjectMetaIndex(path)
+		bvalue []byte
+	)
 
-	var prev_num int32
-	var prev_size int64
+	switch value.(type) {
 
-	if rs := db._raw_get(bkey); rs.Status == skv.ReplyNotFound {
-		prev_num, prev_size = 1, int64(len(value))
-	} else if rs.Status == skv.ReplyOK {
-		prev_size = int64(len(value) - len(rs.Bytes()))
+	case []byte:
+		bvalue = value.([]byte)
+
+	case map[string]interface{}, struct{}:
+		bvalue, _ = skv.JsonEncode(value)
+
+	case string:
+		bvalue = []byte(value.(string))
+
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		bvalue = []byte(fmt.Sprintf("%d", value))
+
+	case bool:
+		if value.(bool) {
+			bvalue = []byte{1}
+		} else {
+			bvalue = []byte{0}
+		}
+
+	default:
+		return skv.NewReply(skv.ReplyInvalidArgument)
 	}
 
-	db._obj_meta_sync(path, 0, prev_num, prev_size, int64(len(value)), ttl)
+	meta = db._raw_get(mkey).ObjectMeta()
 
-	return db._raw_set(bkey, value, 0)
+	db._obj_meta_sync(&meta, path, int64(len(bvalue)), ttl)
+
+	return db._raw_set(bkey, append(meta.Export(), bvalue...), 0)
 }
 
 func (db *DB) ObjectDel(path string) *skv.Reply {
 
 	bkey := skv.ObjectEntryIndex(path)
+	mkey := skv.ObjectMetaIndex(path)
 	rpl := skv.NewReply("")
 
-	if rs := db._raw_get(bkey); rs.Status == skv.ReplyOK {
+	if rs := db._raw_get(mkey); rs.Status == skv.ReplyOK {
+
 		rpl = db._raw_del(bkey)
-		db._obj_meta_sync(path, 0, -1, int64(-len(rs.Bytes())), 0, 0)
+		if rpl.Status != skv.ReplyOK {
+			return rpl
+		}
+
+		ms := rs.ObjectMeta()
+
+		db._obj_meta_sync(&ms, path, -1, 0)
 
 		if _obj_event_handler != nil {
 			_obj_event_handler(path, 0, skv.ObjectEventDeleted)
@@ -105,6 +138,10 @@ func (db *DB) ObjectScan(path, cursor, end string, limit uint32) *skv.Reply {
 			continue
 		}
 
+		if len(iter.Value()) < 53 {
+			continue
+		}
+
 		rpl.Data = append(rpl.Data, skv.BytesClone(iter.Key()[prelen:]))
 		rpl.Data = append(rpl.Data, skv.BytesClone(iter.Value()))
 
@@ -120,17 +157,11 @@ func (db *DB) ObjectScan(path, cursor, end string, limit uint32) *skv.Reply {
 	return rpl
 }
 
-func (db *DB) ObjectMetaGet(path string) *skv.ReplyObjectMeta {
-
-	r := db._raw_get(skv.ObjectMetaIndex(path))
-
-	meta := skv.ObjectMetaParse(r.Bytes())
-	meta.Reply = r
-
-	return &meta
+func (db *DB) ObjectMetaGet(path string) *skv.Reply {
+	return db._raw_get(skv.ObjectMetaIndex(path))
 }
 
-func (db *DB) ObjectMetaScan(path, cursor, end string, limit uint64) *skv.ReplyObjectMetaList {
+func (db *DB) ObjectMetaScan(path, cursor, end string, limit uint64) *skv.Reply {
 
 	if limit > skv.ScanMaxLimit {
 		limit = skv.ScanMaxLimit
@@ -141,10 +172,7 @@ func (db *DB) ObjectMetaScan(path, cursor, end string, limit uint64) *skv.ReplyO
 		prelen = len(prefix)
 		cstart = append(prefix, skv.ObjectStringHex(cursor)...)
 		cend   = append(prefix, skv.ObjectStringHex(end)...)
-		rpl    = &skv.ReplyObjectMetaList{
-			Reply: skv.NewReply(""),
-			Items: []skv.ReplyObjectMeta{},
-		}
+		rpl    = skv.NewReply("")
 	)
 
 	for i := len(cend); i < 256; i++ {
@@ -163,7 +191,8 @@ func (db *DB) ObjectMetaScan(path, cursor, end string, limit uint64) *skv.ReplyO
 			continue
 		}
 
-		rpl.Items = append(rpl.Items, skv.ObjectMetaParse(iter.Value()))
+		rpl.Data = append(rpl.Data, skv.BytesClone(iter.Key()[prelen:]))
+		rpl.Data = append(rpl.Data, skv.BytesClone(iter.Value()))
 
 		limit--
 	}
@@ -177,23 +206,20 @@ func (db *DB) ObjectMetaScan(path, cursor, end string, limit uint64) *skv.ReplyO
 	return rpl
 }
 
-func (db *DB) _obj_meta_sync(path string, otype uint8, pnum int32, psize, size int64, ttl uint32) string {
+func (db *DB) _obj_meta_sync(meta *skv.ObjectMeta, path string, size int64, ttl uint32) string {
 
 	cpath, fold, field, _, _ := skv.ObjectPathSplit(path)
 
-	var meta, pmeta skv.ReplyObjectMeta
-
-	if psize > 0 && size > 0 {
-
-		if r := db._raw_get(skv.ObjectMetaIndex(cpath)); r.Status == skv.ReplyOK {
-			meta = skv.ObjectMetaParse(r.Bytes())
+	//
+	if meta.Type > 0 {
+		if meta.Type != skv.ObjectTypeEntry || meta.Name != field {
+			return skv.ReplyInvalidArgument
 		}
 	}
 
 	//
-	if size > 0 {
-		meta.Len = 0
-		meta.Size = uint64(size)
+	if size >= 0 {
+
 		meta.Version = 0
 
 		//
@@ -202,50 +228,69 @@ func (db *DB) _obj_meta_sync(path string, otype uint8, pnum int32, psize, size i
 		}
 		meta.Updated = skv.MetaTimeNow()
 
+		meta.Len = 0
+
 		meta.Name = field
 	}
 
 	_obj_meta_locker.Lock()
 	defer _obj_meta_locker.Unlock()
 
-	if r := db._raw_get(skv.ObjectMetaIndex(fold)); r.Status == skv.ReplyOK {
+	var (
+		fold_size int64
+		fold_name string
+		fold_meta = db._raw_get(skv.ObjectMetaIndex(fold)).ObjectMeta()
+	)
 
-		pmeta = skv.ObjectMetaParse(r.Bytes())
-
-		if pmeta.Len == 0 {
-			return skv.ReplyInvalidArgument
-		}
+	if fold_meta.Type > 0 && fold_meta.Type != skv.ObjectTypeFold {
+		return skv.ReplyInvalidArgument
 	}
-
-	//
-	pnum += int32(pmeta.Len)
-	if pnum < 0 {
-		pnum = 0
-	}
-	pmeta.Len = uint32(pnum)
-
-	psize += int64(pmeta.Size)
-	if psize < 0 {
-		psize = 0
-	}
-	pmeta.Size = uint64(psize)
-
-	//
-	if pmeta.Created < 1 {
-		pmeta.Created = skv.MetaTimeNow()
-	}
-	pmeta.Updated = skv.MetaTimeNow()
 
 	if i := strings.LastIndex(fold, "/"); i > 0 {
-		pmeta.Name = fold[:i]
+		fold_name = fold[:i]
 	} else {
-		pmeta.Name = fold
+		fold_name = fold
 	}
+
+	if fold_meta.Type > 0 && fold_meta.Name != fold_name {
+		return skv.ReplyInvalidArgument
+	}
+
+	//
+	fold_meta.Type = skv.ObjectTypeFold
+	fold_meta.Name = fold_name
+
+	//
+	if size >= 0 && meta.Type < 1 {
+		fold_meta.Len++
+	} else if size < 0 && fold_meta.Len > 0 {
+		fold_meta.Len--
+	}
+	meta.Type = skv.ObjectTypeEntry
+
+	if size >= 0 {
+		fold_size = int64(fold_meta.Size) + (size - int64(meta.Size))
+		meta.Size = uint64(size)
+	} else {
+		fold_size = int64(fold_meta.Size) - int64(meta.Size)
+	}
+
+	if fold_size > 0 {
+		fold_meta.Size = uint64(fold_size)
+	} else {
+		fold_meta.Size = 0
+	}
+
+	//
+	if fold_meta.Created < 1 {
+		fold_meta.Created = skv.MetaTimeNow()
+	}
+	fold_meta.Updated = skv.MetaTimeNow()
 
 	//
 	batch := new(leveldb.Batch)
 
-	if size > 0 {
+	if size >= 0 {
 
 		if ok := db._raw_set_ttl(skv.NsObjectEntry, []byte(path), ttl); !ok {
 			return "ServerError TTL Set"
@@ -257,10 +302,10 @@ func (db *DB) _obj_meta_sync(path string, otype uint8, pnum int32, psize, size i
 		batch.Delete(skv.ObjectMetaIndex(cpath))
 	}
 
-	if pmeta.Len < 1 {
+	if fold_meta.Len < 1 {
 		batch.Delete(skv.ObjectMetaIndex(fold))
 	} else {
-		batch.Put(skv.ObjectMetaIndex(fold), pmeta.Export())
+		batch.Put(skv.ObjectMetaIndex(fold), fold_meta.Export())
 	}
 
 	if err := db.ldb.Write(batch, nil); err != nil {

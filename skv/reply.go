@@ -131,17 +131,68 @@ func (r *Reply) List() [][]byte {
 
 func (r *Reply) Hash() []Entry {
 
-	hs := []Entry{}
+	ls := []Entry{}
 
 	for i := 0; i < (len(r.Data) - 1); i += 2 {
-		hs = append(hs, Entry{r.Data[i], r.Data[i+1]})
+		ls = append(ls, Entry{r.Data[i], r.Data[i+1]})
 	}
 
-	return hs
+	return ls
 }
 
 func (r *Reply) JsonDecode(v interface{}) error {
 	return JsonDecode(r.Bytes(), v)
+}
+
+func (r *Reply) Object() *Object {
+
+	o := &Object{
+		Status: r.Status,
+		Meta:   ObjectMetaParse(r.Bytes()),
+	}
+
+	if o.Meta.seek_len > 0 {
+		o.EntryValue = r.Bytes()[int(o.Meta.seek_len):]
+		// o.Data = r.Bytes()[int(o.Meta.seek_len):]
+	}
+
+	return o
+}
+
+func (r *Reply) ObjectList() []*Object {
+
+	ls := []*Object{}
+
+	for i := 0; i < (len(r.Data) - 1); i += 2 {
+
+		o := &Object{
+			Meta: ObjectMetaParse(r.Data[i+1]),
+			Key:  r.Data[i],
+		}
+
+		if o.Meta.seek_len > 0 {
+			o.EntryValue = r.Data[i+1][int(o.Meta.seek_len):]
+		}
+
+		ls = append(ls, o)
+	}
+
+	return ls
+}
+
+func (r *Reply) ObjectMeta() ObjectMeta {
+	return ObjectMetaParse(r.Bytes())
+}
+
+func (r *Reply) ObjectMetaList() []ObjectMeta {
+
+	ls := []ObjectMeta{}
+
+	for i := 0; i < (len(r.Data) - 1); i += 2 {
+		ls = append(ls, ObjectMetaParse(r.Data[i+1]))
+	}
+
+	return ls
 }
 
 func (e *Entry) String() string {
@@ -159,4 +210,87 @@ func (e *Entry) Uint64() uint64 {
 
 func (e *Entry) JsonDecode(v interface{}) error {
 	return JsonDecode(e.Value, v)
+}
+
+//
+type EntryValue []byte
+
+func (v EntryValue) Bytes() []byte {
+	return v
+}
+
+func (v EntryValue) String() string {
+	return string(v.Bytes())
+}
+
+func (v EntryValue) Int64() int64 {
+
+	if i64, err := strconv.ParseInt(v.String(), 10, 64); err == nil {
+		return i64
+	}
+
+	return 0
+}
+
+func (v EntryValue) Int32() int32 {
+	return int32(v.Int64())
+}
+
+func (v EntryValue) Int16() int16 {
+	return int16(v.Int64())
+}
+
+func (v EntryValue) Int8() int8 {
+	return int8(v.Int64())
+}
+
+func (v EntryValue) Int() int {
+	return int(v.Int64())
+}
+
+func (v EntryValue) Uint64() uint64 {
+
+	if ui64, err := strconv.ParseUint(v.String(), 10, 64); err == nil {
+		return ui64
+	}
+
+	return 0
+}
+
+func (v EntryValue) Uint32() uint32 {
+	return uint32(v.Uint64())
+}
+
+func (v EntryValue) Uint16() uint16 {
+	return uint16(v.Uint64())
+}
+
+func (v EntryValue) Uint8() uint8 {
+	return uint8(v.Uint64())
+}
+
+func (v EntryValue) Uint() uint {
+	return uint(v.Uint64())
+}
+
+func (v EntryValue) Float64() float64 {
+
+	if f64, err := strconv.ParseFloat(v.String(), 64); err == nil {
+		return f64
+	}
+
+	return 0
+}
+
+func (v EntryValue) Bool() bool {
+
+	if b, err := strconv.ParseBool(v.String()); err == nil {
+		return b
+	}
+
+	return false
+}
+
+func (v EntryValue) JsonDecode(vi interface{}) error {
+	return JsonDecode(v.Bytes(), vi)
 }

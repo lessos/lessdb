@@ -26,33 +26,75 @@ import (
 )
 
 const (
-	obj_fold_len   = 12
-	obj_field_len  = 8
-	obj_type_bytes = 0x00
-	obj_type_json  = 0x01
-	obj_type_index = 0x02
+	ObjectTypeFold  = 0x01
+	ObjectTypeEntry = 0x11
+
+	obj_fold_len  = 12
+	obj_field_len = 8
+
+	ObjectEventCreated uint8 = 1
+	ObjectEventUpdated uint8 = 2
+	ObjectEventDeleted uint8 = 3
 )
 
-const (
-	ObjectEventCreated = 0x01
-	ObjectEventUpdated = 0x02
-	ObjectEventDeleted = 0x03
-)
-
-type ObjectEventHandler func(string, uint64, uint16)
+type ObjectEventHandler func(string, uint64, uint8)
 
 type ObjectInterface interface {
 	ObjectEventRegister(ev ObjectEventHandler)
 	//
 	ObjectGet(path string) *Reply
-	ObjectSet(path string, value []byte, ttl uint32) *Reply
-	// ObjectSetJson(path string, value interface{}, ttl uint64) *Reply
+	ObjectSet(path string, value interface{}, ttl uint32) *Reply
 	ObjectDel(path string) *Reply
 	ObjectScan(path, cursor, end string, limit uint32) *Reply
 	// ObjectSchemaSync(key []byte, schema IsetSchema) *Reply
 	// ObjectQuery(key []byte, qry *QuerySet) *Reply
-	ObjectMetaGet(path string) *ReplyObjectMeta
-	ObjectMetaScan(path, cursor, end string, limit uint64) *ReplyObjectMetaList
+	ObjectMetaGet(path string) *Reply
+	ObjectMetaScan(path, cursor, end string, limit uint64) *Reply
+}
+
+type Object struct {
+	EntryValue
+	Status string
+	Meta   ObjectMeta
+	Key    []byte
+}
+
+// common
+//  - mtype    1 0:1
+//  - seek_len 2 1:3
+//
+//  - version  8 3:11
+//  - size     8 11:19
+//  - created  8 19:27
+//  - updated  8 27:35
+//
+//  - group    4 35:39
+//  - user     4 39:43
+//  - mode     1 43:44
+//  - ttl      4 44:48
+//
+// fold
+//  - len      4 48:52
+// entry
+//	- sumcheck 4 48:52
+//
+// common
+//  - name_len 1 52:53
+//  - name     n
+type ObjectMeta struct {
+	seek_len int
+	Type     uint8  `json:"type"`
+	Version  uint64 `json:"version,omitempty"`
+	Size     uint64 `json:"size"`
+	Created  uint64 `json:"created"`
+	Updated  uint64 `json:"updated"`
+	Group    uint32 `json:"group,omitempty"`
+	User     uint32 `json:"user,omitempty"`
+	Mode     uint8  `json:"mode,omitempty"`
+	Ttl      uint32 `json:"ttl,omitempty"`
+	Len      uint32 `json:"len,omitempty"`
+	SumCheck uint32 `json:"sumcheck,omitempty"`
+	Name     string `json:"name"`
 }
 
 func _obj_clean_path(path string) string {
@@ -151,93 +193,83 @@ func ObjectMetaFold(path string) []byte {
 	return _obj_entry_meta_prefix(_obj_str_hash(_obj_clean_path(path), obj_fold_len))
 }
 
-type ReplyObjectMeta struct {
-	*Reply   `json:",omitempty"`
-	Type     uint8  `json:"type,omitempty"`     // 1
-	Len      uint32 `json:"len,omitempty"`      // 4
-	Size     uint64 `json:"size,omitempty"`     // 8
-	Version  uint64 `json:"version,omitempty"`  // 8
-	Created  uint64 `json:"created,omitempty"`  // 8
-	Updated  uint64 `json:"updated,omitempty"`  // 8
-	Ttl      uint32 `json:"ttl,omitempty"`      // 4
-	Group    uint32 `json:"group,omitempty"`    // 4
-	User     uint32 `json:"user,omitempty"`     // 4
-	Mode     uint8  `json:"mode,omitempty"`     // 1
-	SumCheck uint32 `json:"sumcheck,omitempty"` // 4
-	NameLen  uint16 `json:"namelen,omitempty"`  // 2
-	Name     string `json:"name,omitempty"`     // n
-	data     []byte `json:",omitempty"`
-}
+func ObjectMetaParse(data []byte) ObjectMeta {
 
-type ReplyObjectMetaList struct {
-	*Reply `json:",omitempty"`
-	Items  []ReplyObjectMeta `json:"items,omitempty"`
-}
+	m := ObjectMeta{}
 
-func ObjectMetaParse(data []byte) ReplyObjectMeta {
+	if len(data) > 53 {
 
-	for i := len(data); i < 56; i++ {
-		data = append(data, 0x00)
+		//
+		m.Type = data[0]
+		m.seek_len = int(binary.BigEndian.Uint16(data[1:3]))
+
+		//
+		m.Version = binary.BigEndian.Uint64(data[3:11])
+		m.Size = binary.BigEndian.Uint64(data[11:19])
+		m.Created = binary.BigEndian.Uint64(data[19:27])
+		m.Updated = binary.BigEndian.Uint64(data[27:35])
+
+		//
+		m.Group = binary.BigEndian.Uint32(data[35:39])
+		m.User = binary.BigEndian.Uint32(data[39:43])
+		m.Mode = data[43]
+		m.Ttl = binary.BigEndian.Uint32(data[44:48])
+
+		//
+		if m.Type == ObjectTypeFold {
+			m.Len = binary.BigEndian.Uint32(data[48:52])
+		} else if m.Type == ObjectTypeEntry {
+			m.SumCheck = binary.BigEndian.Uint32(data[48:52])
+		}
+
+		//
+		if len(data) >= m.seek_len {
+			// m.NameLen = data[52]
+			m.Name = string(data[53:m.seek_len])
+		}
 	}
 
-	return ReplyObjectMeta{
-		//
-		Type: data[0],
-		//
-		Len:  binary.BigEndian.Uint32(data[1:5]),
-		Size: binary.BigEndian.Uint64(data[5:13]),
-		//
-		Version: binary.BigEndian.Uint64(data[13:21]),
-		Created: binary.BigEndian.Uint64(data[21:29]),
-		Updated: binary.BigEndian.Uint64(data[29:37]),
-		//
-		Ttl:   binary.BigEndian.Uint32(data[37:41]),
-		Group: binary.BigEndian.Uint32(data[41:45]),
-		User:  binary.BigEndian.Uint32(data[45:49]),
-		Mode:  data[49],
-		//
-		SumCheck: binary.BigEndian.Uint32(data[50:54]),
-		//
-		NameLen: binary.BigEndian.Uint16(data[54:56]),
-		Name:    string(data[56:]),
-		//
-		data: data,
-	}
+	return m
 }
 
-func (m *ReplyObjectMeta) Export() []byte {
+func (m *ObjectMeta) Export() []byte {
 
-	for i := len(m.data); i < 56; i++ {
-		m.data = append(m.data, 0x00)
+	data := make([]byte, 53)
+
+	//
+	data[0] = m.Type
+
+	//
+	binary.BigEndian.PutUint64(data[3:11], m.Version)
+	binary.BigEndian.PutUint64(data[11:19], m.Size)
+	binary.BigEndian.PutUint64(data[19:27], m.Created)
+	binary.BigEndian.PutUint64(data[27:35], m.Updated)
+
+	//
+
+	binary.BigEndian.PutUint32(data[35:39], m.Group)
+	binary.BigEndian.PutUint32(data[39:43], m.User)
+	binary.BigEndian.PutUint32(data[44:48], m.Ttl)
+
+	//
+	if m.Type == ObjectTypeFold {
+		binary.BigEndian.PutUint32(data[48:52], m.Len)
+	} else if m.Type == ObjectTypeEntry {
+		binary.BigEndian.PutUint32(data[48:52], m.SumCheck)
 	}
 
-	m.data[0] = m.Type
-
 	//
-	binary.BigEndian.PutUint32(m.data[1:5], m.Len)
-	binary.BigEndian.PutUint64(m.data[5:13], m.Size)
+	namelen := len(m.Name)
+	if namelen > 200 {
+		namelen = 200
+	}
 
-	//
-	binary.BigEndian.PutUint64(m.data[13:21], m.Version)
-	binary.BigEndian.PutUint64(m.data[21:29], m.Created)
-	binary.BigEndian.PutUint64(m.data[29:37], m.Updated)
+	if namelen > 0 {
+		data[52] = uint8(namelen)
+		data = append(data, []byte(m.Name[:namelen])...)
+	}
 
-	//
-	binary.BigEndian.PutUint32(m.data[37:41], m.Ttl)
-	binary.BigEndian.PutUint32(m.data[41:45], m.Group)
-	binary.BigEndian.PutUint32(m.data[45:49], m.User)
+	binary.BigEndian.PutUint16(data[1:3], uint16(len(data)))
 
-	//
-	binary.BigEndian.PutUint16(m.data[54:56], m.NameLen)
-	m.data = append(m.data[:56], []byte(m.Name)...)
-
-	return m.data
+	return data
 }
-
-// func (om *ReplyObjectMeta) MarshalBinary() (data []byte, err error) {
-// 	return []byte{}, nil
-// }
-
-// func (om *ReplyObjectMeta) UnmarshalBinary(data []byte) error {
-// 	return nil
-// }
