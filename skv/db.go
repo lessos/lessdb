@@ -40,11 +40,6 @@ const (
 	ns_zset_entry           = 0x83
 	ns_zset_score           = 0x84
 	ns_zset_length          = 0x85
-	ns_iset_schema          = 0x86
-	ns_iset_entry           = 0x87
-	ns_iset_index           = 0x88
-	ns_iset_length          = 0x89
-	ns_iset_increment       = 0x90
 	ns_object_meta          = 0xa0
 	NsObjectEntry           = 0xa1
 	ns_object_doc_schema    = 0xa2
@@ -83,15 +78,6 @@ type DB interface {
 	Zdel(key, member []byte) *Reply
 	Zrange(key []byte, score_start, score_end, limit uint64) *Reply
 	Zlen(key []byte) *Reply
-
-	// // Indexed Key JSON APIs
-	// IschemaSet(key []byte, schema IsetSchema) *Reply
-	// Iget(key, prikey []byte) *Reply
-	// Iset(key, prikey []byte, obj interface{}) *Reply
-	// Idel(key, prikey []byte) *Reply
-	// Iscan(key, cursor, end []byte, limit uint64) *Reply
-	// Iquery(key []byte, qry *QuerySet) *Reply
-	// Ilen(key []byte) *Reply
 
 	// Client APIs
 	Close()
