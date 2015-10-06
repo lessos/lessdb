@@ -30,7 +30,7 @@ var (
 	_iset_global_locker sync.Mutex
 )
 
-type empty struct{}
+// type empty struct{}
 
 func (db *DB) Iget(key, prikey []byte) *skv.Reply {
 	return db._raw_get(skv.IsetEntryKey(key, prikey))

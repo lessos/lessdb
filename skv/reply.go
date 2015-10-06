@@ -153,7 +153,6 @@ func (r *Reply) Object() *Object {
 
 	if o.Meta.seek_len > 0 {
 		o.EntryValue = r.Bytes()[int(o.Meta.seek_len):]
-		// o.Data = r.Bytes()[int(o.Meta.seek_len):]
 	}
 
 	return o
@@ -292,5 +291,5 @@ func (v EntryValue) Bool() bool {
 }
 
 func (v EntryValue) JsonDecode(vi interface{}) error {
-	return JsonDecode(v.Bytes(), vi)
+	return JsonDecode(v, vi)
 }

@@ -31,22 +31,25 @@ const (
 	ObjectMetaIndexJson = 0x02
 
 	//
-	ns_zero           = 0x00
-	NsRawTtlEntry     = 0x70
-	NsRawTtlQueue     = 0x71
-	ns_set_entry      = 0x80
-	ns_hash_entry     = 0x81
-	ns_hash_len       = 0x82
-	ns_zset_entry     = 0x83
-	ns_zset_score     = 0x84
-	ns_zset_length    = 0x85
-	ns_iset_schema    = 0x86
-	ns_iset_entry     = 0x87
-	ns_iset_index     = 0x88
-	ns_iset_length    = 0x89
-	ns_iset_increment = 0x90
-	ns_object_meta    = 0xa0
-	NsObjectEntry     = 0xa1
+	ns_zero                 = 0x00
+	NsRawTtlEntry           = 0x70
+	NsRawTtlQueue           = 0x71
+	ns_set_entry            = 0x80
+	ns_hash_entry           = 0x81
+	ns_hash_len             = 0x82
+	ns_zset_entry           = 0x83
+	ns_zset_score           = 0x84
+	ns_zset_length          = 0x85
+	ns_iset_schema          = 0x86
+	ns_iset_entry           = 0x87
+	ns_iset_index           = 0x88
+	ns_iset_length          = 0x89
+	ns_iset_increment       = 0x90
+	ns_object_meta          = 0xa0
+	NsObjectEntry           = 0xa1
+	ns_object_doc_schema    = 0xa2
+	ns_object_doc_index     = 0xa3
+	ns_object_doc_increment = 0xa4
 )
 
 var (
@@ -81,14 +84,14 @@ type DB interface {
 	Zrange(key []byte, score_start, score_end, limit uint64) *Reply
 	Zlen(key []byte) *Reply
 
-	// Indexed Key JSON APIs
-	IschemaSet(key []byte, schema IsetSchema) *Reply
-	Iget(key, prikey []byte) *Reply
-	Iset(key, prikey []byte, obj interface{}) *Reply
-	Idel(key, prikey []byte) *Reply
-	Iscan(key, cursor, end []byte, limit uint64) *Reply
-	Iquery(key []byte, qry *QuerySet) *Reply
-	Ilen(key []byte) *Reply
+	// // Indexed Key JSON APIs
+	// IschemaSet(key []byte, schema IsetSchema) *Reply
+	// Iget(key, prikey []byte) *Reply
+	// Iset(key, prikey []byte, obj interface{}) *Reply
+	// Idel(key, prikey []byte) *Reply
+	// Iscan(key, cursor, end []byte, limit uint64) *Reply
+	// Iquery(key []byte, qry *QuerySet) *Reply
+	// Ilen(key []byte) *Reply
 
 	// Client APIs
 	Close()

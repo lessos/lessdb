@@ -26,30 +26,100 @@ import (
 )
 
 const (
-	ObjectTypeFold  = 0x01
-	ObjectTypeEntry = 0x11
-
-	obj_fold_len  = 12
-	obj_field_len = 8
+	ObjectTypeFold     = 0x01
+	ObjectTypeGeneral  = 0x0a
+	ObjectTypeDocument = 0x0b
 
 	ObjectEventCreated uint8 = 1
 	ObjectEventUpdated uint8 = 2
 	ObjectEventDeleted uint8 = 3
+
+	obj_fold_len  = 12
+	obj_field_len = 8
 )
 
-type ObjectEventHandler func(string, uint64, uint8)
+type ObjectEventHandler func(opath *ObjectPath, evtype uint8, version uint64)
 
 type ObjectInterface interface {
+	//
 	ObjectEventRegister(ev ObjectEventHandler)
 	//
 	ObjectGet(path string) *Reply
 	ObjectSet(path string, value interface{}, ttl uint32) *Reply
 	ObjectDel(path string) *Reply
-	ObjectScan(path, cursor, end string, limit uint32) *Reply
-	// ObjectSchemaSync(key []byte, schema IsetSchema) *Reply
-	// ObjectQuery(key []byte, qry *QuerySet) *Reply
+	ObjectScan(fold, cursor, end string, limit uint32) *Reply
+	//
 	ObjectMetaGet(path string) *Reply
-	ObjectMetaScan(path, cursor, end string, limit uint64) *Reply
+	ObjectMetaScan(fold, cursor, end string, limit uint64) *Reply
+	//
+	ObjectDocSchemaSync(fold string, schema ObjectDocSchema) *Reply
+	ObjectDocGet(fold, key string) *Reply
+	ObjectDocSet(fold, key string, value interface{}, ttl uint32) *Reply
+	ObjectDocDel(fold, key string) *Reply
+	ObjectDocQuery(fold string, qry *ObjectDocQuerySet) *Reply
+}
+
+type ObjectPath struct {
+	Fold      []byte
+	FoldName  string
+	Field     []byte
+	FieldName string
+}
+
+func (op *ObjectPath) EntryIndex() []byte {
+	return append(_obj_entry_key_prefix(op.Fold), op.Field...)
+}
+
+func (op *ObjectPath) MetaIndex() []byte {
+	return append(_obj_entry_meta_prefix(op.Fold), op.Field...)
+}
+
+func (op *ObjectPath) EntryPath() string {
+	// return ObjectPathClean(op.FoldName + "/" + hex.EncodeToString(op.Field))
+	return ObjectPathClean(op.FoldName + "/" + op.FieldName)
+}
+
+func (op *ObjectPath) Parent() *ObjectPath {
+	return NewObjectPathParse(op.FoldName)
+}
+
+func NewObjectPathKey(fold, key string) *ObjectPath {
+
+	op := &ObjectPath{
+		FoldName: ObjectPathClean(fold),
+	}
+
+	op.Fold = _obj_str_hash(op.FoldName, obj_fold_len)
+
+	klen := len(key)
+	if klen > 32 {
+		klen = 32
+	}
+
+	if v, err := hex.DecodeString(key[:klen]); err == nil {
+		op.Field = v
+		op.FieldName = key[:klen]
+	}
+
+	return op
+}
+
+func NewObjectPathParse(path string) *ObjectPath {
+
+	op := &ObjectPath{}
+
+	path = ObjectPathClean(path)
+
+	if i := strings.LastIndex(path, "/"); i > 0 {
+		op.FoldName, op.FieldName = path[:i], path[i+1:]
+	} else {
+		op.FoldName, op.FieldName = "", path
+	}
+
+	op.Fold = _obj_str_hash(op.FoldName, obj_fold_len)
+	op.Field = _obj_str_hash(op.FieldName, obj_field_len)
+
+	return op
 }
 
 type Object struct {
@@ -97,7 +167,7 @@ type ObjectMeta struct {
 	Name     string `json:"name"`
 }
 
-func _obj_clean_path(path string) string {
+func ObjectPathClean(path string) string {
 	return strings.Trim(filepath.Clean(path), "/")
 }
 
@@ -115,20 +185,6 @@ func _obj_str_hash(str string, num int) []byte {
 	return h.Sum(nil)[:num]
 }
 
-func ObjectPathSplit(path string) (string, string, string, []byte, []byte) {
-
-	path = _obj_clean_path(path)
-
-	fold, field := "", path
-
-	if i := strings.LastIndex(path, "/"); i > 0 {
-		fold, field = path[:i], path[i+1:]
-	}
-
-	return path, fold, field,
-		_obj_str_hash(fold, obj_fold_len), _obj_str_hash(field, obj_field_len)
-}
-
 func _obj_entry_key_prefix(key []byte) []byte {
 
 	si := len(key)
@@ -143,7 +199,7 @@ func _obj_entry_meta_prefix(key []byte) []byte {
 	return append([]byte{ns_object_meta, uint8(len(key))}, key...)
 }
 
-func ObjectRandomKey(length int) []byte {
+func ObjectRandomKey(length int) string {
 
 	if length < 1 {
 		length = 1
@@ -155,7 +211,8 @@ func ObjectRandomKey(length int) []byte {
 
 	io.ReadFull(rand.Reader, key)
 
-	return key
+	// return fmt.Sprintf("%x", key)
+	return hex.EncodeToString(key)
 }
 
 func ObjectStringHex(key string) []byte {
@@ -171,26 +228,12 @@ func ObjectHexString(key []byte) string {
 	return hex.EncodeToString(key)
 }
 
-func ObjectEntryIndex(path string) []byte {
-
-	_, _, _, fold, field := ObjectPathSplit(path)
-
-	return append(_obj_entry_key_prefix(fold), field...)
-}
-
 func ObjectEntryFold(path string) []byte {
-	return _obj_entry_key_prefix(_obj_str_hash(_obj_clean_path(path), obj_fold_len))
-}
-
-func ObjectMetaIndex(path string) []byte {
-
-	_, _, _, fold, field := ObjectPathSplit(path)
-
-	return append(_obj_entry_meta_prefix(fold), field...)
+	return _obj_entry_key_prefix(_obj_str_hash(ObjectPathClean(path), obj_fold_len))
 }
 
 func ObjectMetaFold(path string) []byte {
-	return _obj_entry_meta_prefix(_obj_str_hash(_obj_clean_path(path), obj_fold_len))
+	return _obj_entry_meta_prefix(_obj_str_hash(ObjectPathClean(path), obj_fold_len))
 }
 
 func ObjectMetaParse(data []byte) ObjectMeta {
@@ -218,7 +261,7 @@ func ObjectMetaParse(data []byte) ObjectMeta {
 		//
 		if m.Type == ObjectTypeFold {
 			m.Len = binary.BigEndian.Uint32(data[48:52])
-		} else if m.Type == ObjectTypeEntry {
+		} else if m.Type == ObjectTypeGeneral {
 			m.SumCheck = binary.BigEndian.Uint32(data[48:52])
 		}
 
@@ -254,7 +297,7 @@ func (m *ObjectMeta) Export() []byte {
 	//
 	if m.Type == ObjectTypeFold {
 		binary.BigEndian.PutUint32(data[48:52], m.Len)
-	} else if m.Type == ObjectTypeEntry {
+	} else if m.Type == ObjectTypeGeneral {
 		binary.BigEndian.PutUint32(data[48:52], m.SumCheck)
 	}
 
