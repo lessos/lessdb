@@ -123,17 +123,17 @@ func (db *DB) _raw_revscan(cursor, end []byte, limit uint64) *skv.Reply {
 	return rpl
 }
 
-func (db *DB) _raw_set_json(key []byte, value interface{}, ttl uint64) *skv.Reply {
+func (db *DB) _raw_put_json(key []byte, value interface{}, ttl uint64) *skv.Reply {
 
 	bvalue, err := skv.JsonEncode(value)
 	if err != nil {
 		return skv.NewReply(err.Error())
 	}
 
-	return db._raw_set(key, bvalue, ttl)
+	return db._raw_put(key, bvalue, ttl)
 }
 
-func (db *DB) _raw_set(key, value []byte, ttl uint64) *skv.Reply {
+func (db *DB) _raw_put(key, value []byte, ttl uint64) *skv.Reply {
 
 	rpl := skv.NewReply("")
 
@@ -143,7 +143,7 @@ func (db *DB) _raw_set(key, value []byte, ttl uint64) *skv.Reply {
 			return rpl
 		}
 
-		rpl = db.Zset(skv.SetTtlPrefix(), key, skv.TimeNowMS()+ttl)
+		rpl = db.SortSets(skv.SetTtlPrefix(), key, skv.TimeNowMS()+ttl)
 		if rpl.Status != skv.ReplyOK {
 			return rpl
 		}
@@ -159,9 +159,9 @@ func (db *DB) _raw_set(key, value []byte, ttl uint64) *skv.Reply {
 	return rpl
 }
 
-func (db *DB) _raw_ttl(key []byte) *skv.Reply {
+func (db *DB) _raw_ttl_get(key []byte) *skv.Reply {
 
-	ttl := db.Zget(skv.SetTtlPrefix(), key).Int64() - int64(skv.TimeNowMS())
+	ttl := db.SsGet(skv.SetTtlPrefix(), key).Int64() - int64(skv.TimeNowMS())
 	if ttl < 0 {
 		ttl = -1
 	}
@@ -201,7 +201,7 @@ func (db *DB) _raw_incrby(key []byte, step int64) *skv.Reply {
 	}
 
 	bnum := []byte(strconv.FormatUint(num, 10))
-	rpl := db._raw_set(key, bnum, 0)
+	rpl := db._raw_put(key, bnum, 0)
 	if rpl.Status == skv.ReplyOK {
 		rpl.Data = append(rpl.Data, bnum)
 	}

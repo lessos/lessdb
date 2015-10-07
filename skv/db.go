@@ -26,58 +26,45 @@ const (
 	ScanMaxLimit   uint64 = 10000
 
 	//
-	ObjectMetaBytes     = 0x00
-	ObjectMetaJson      = 0x01
-	ObjectMetaIndexJson = 0x02
-
-	//
-	ns_zero                 = 0x00
 	NsRawTtlEntry           = 0x70
 	NsRawTtlQueue           = 0x71
-	ns_set_entry            = 0x80
+	NsKvEntry               = 0x80
 	ns_hash_entry           = 0x81
 	ns_hash_len             = 0x82
-	ns_zset_entry           = 0x83
-	ns_zset_score           = 0x84
-	ns_zset_length          = 0x85
-	ns_object_meta          = 0xa0
-	NsObjectEntry           = 0xa1
-	ns_object_doc_schema    = 0xa2
-	ns_object_doc_index     = 0xa3
-	ns_object_doc_increment = 0xa4
-)
-
-var (
-	ns_set_ttl = []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00}
+	ns_ss_entry             = 0x83
+	ns_ss_score             = 0x84
+	ns_ss_length            = 0x85
+	ns_object_meta          = 0x90
+	NsObjectEntry           = 0x91
+	ns_object_doc_schema    = 0x92
+	ns_object_doc_index     = 0x93
+	ns_object_doc_increment = 0x94
 )
 
 type DB interface {
-	// Raw
-	// RawScan(cursor, end []byte, limit uint64) *Reply
+	// Key Value
+	KvGet(key []byte) *Reply
+	KvPut(key, value []byte, ttl uint32) *Reply
+	KvPutJson(key []byte, value interface{}, ttl uint32) *Reply
+	KvDel(keys ...[]byte) *Reply
+	KvScan(cursor, end []byte, limit uint64) *Reply
+	KvIncrby(key []byte, step int64) *Reply
+	KvTtl(key []byte) *Reply
 
-	// General Key Value APIs
-	Get(key []byte) *Reply
-	Set(key, value []byte, ttl uint64) *Reply
-	SetJson(key []byte, value interface{}, ttl uint64) *Reply
-	Del(keys ...[]byte) *Reply
-	Scan(cursor, end []byte, limit uint64) *Reply
-	Incrby(key []byte, step int64) *Reply
-	Ttl(key []byte) *Reply
+	// Hashs
+	HashGet(key, field []byte) *Reply
+	HashPut(key, field, value []byte, ttl uint32) *Reply
+	HashPutJson(key, field []byte, value interface{}, ttl uint32) *Reply
+	HashDel(key, field []byte) *Reply
+	HashScan(key, cursor, end []byte, limit uint64) *Reply
+	HashLen(key []byte) *Reply
 
-	// Hash Key Value APIs
-	Hget(key, field []byte) *Reply
-	Hset(key, field, value []byte, ttl uint64) *Reply
-	HsetJson(key, field []byte, value interface{}, ttl uint64) *Reply
-	Hdel(key, field []byte) *Reply
-	Hscan(key, cursor, end []byte, limit uint64) *Reply
-	Hlen(key []byte) *Reply
-
-	// Sorted Key Value APIs
-	Zget(key, member []byte) *Reply
-	Zset(key, member []byte, score uint64) *Reply
-	Zdel(key, member []byte) *Reply
-	Zrange(key []byte, score_start, score_end, limit uint64) *Reply
-	Zlen(key []byte) *Reply
+	// Sorted Sets
+	SsGet(key, member []byte) *Reply
+	SsPut(key, member []byte, score uint64) *Reply
+	SsDel(key, member []byte) *Reply
+	SsRange(key []byte, score_start, score_end, limit uint64) *Reply
+	SsLen(key []byte) *Reply
 
 	// Client APIs
 	Close()

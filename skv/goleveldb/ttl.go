@@ -23,40 +23,11 @@ import (
 
 func (db *DB) ttl_worker() {
 
-	// ttl v1
 	go func() {
 
 		for {
 
-			ls := db.Zrange(skv.SetTtlPrefix(), 0, skv.TimeNowMS(), skv.TtlWorkerLimit).Hash()
-
-			for _, v := range ls {
-
-				batch := new(leveldb.Batch)
-
-				batch.Delete(skv.ZsetScoreKey(skv.SetTtlPrefix(), v.Key, v.Uint64()))
-
-				if rs := db.Zget(skv.SetTtlPrefix(), v.Key).Uint64(); rs == v.Uint64() {
-					batch.Delete(skv.ZsetKey(skv.SetTtlPrefix(), v.Key))
-					batch.Delete(v.Key)
-				}
-
-				db.ldb.Write(batch, nil)
-				db._raw_incrby(skv.ZsetLenKey(skv.SetTtlPrefix()), -1)
-			}
-
-			if uint64(len(ls)) < skv.TtlWorkerLimit {
-				time.Sleep(skv.TtlWorkerSleep)
-			}
-		}
-	}()
-
-	// ttl v2
-	go func() {
-
-		for {
-
-			ls := db._raw_ttl_range(0, skv.TimeNowMS(), skv.TtlWorkerLimit).Hash()
+			ls := db._raw_ssttl_range(0, skv.TimeNowMS(), skv.TtlWorkerLimit).Hash()
 
 			for _, v := range ls {
 
@@ -67,8 +38,12 @@ func (db *DB) ttl_worker() {
 					batch.Delete(skv.RawTtlEntry(v.Key[9:]))
 
 					switch v.Key[9] {
+
 					case skv.NsObjectEntry:
 						db.ObjectDel(string(v.Key[10:]))
+
+					case skv.NsKvEntry:
+						batch.Delete(v.Key[9:])
 					}
 				}
 

@@ -19,11 +19,46 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
-func (db *DB) Hget(key, field []byte) *skv.Reply {
+func (db *DB) HashGet(key, field []byte) *skv.Reply {
 	return db._raw_get(skv.HashKey(key, field))
 }
 
-func (db *DB) Hscan(key, cursor, end []byte, limit uint64) *skv.Reply {
+func (db *DB) HashPut(key, field, value []byte, ttl uint32) *skv.Reply {
+
+	bkey := skv.HashKey(key, field)
+
+	if rs := db._raw_get(bkey); rs.Status == skv.ReplyNotFound {
+		db._raw_incrby(skv.HashLenKey(key), 1)
+	}
+
+	return db._raw_put(bkey, value, 0)
+}
+
+func (db *DB) HashPutJson(key, field []byte, value interface{}, ttl uint32) *skv.Reply {
+
+	bkey := skv.HashKey(key, field)
+
+	if rs := db._raw_get(bkey); rs.Status == skv.ReplyNotFound {
+		db._raw_incrby(skv.HashLenKey(key), 1)
+	}
+
+	return db._raw_put_json(bkey, value, 0)
+}
+
+func (db *DB) HashDel(key, field []byte) *skv.Reply {
+
+	bkey := skv.HashKey(key, field)
+	rpl := skv.NewReply("")
+
+	if rs := db._raw_get(bkey); rs.Status == skv.ReplyOK {
+		db._raw_incrby(skv.HashLenKey(key), -1)
+		rpl = db._raw_del(bkey)
+	}
+
+	return rpl
+}
+
+func (db *DB) HashScan(key, cursor, end []byte, limit uint64) *skv.Reply {
 
 	if limit > skv.ScanMaxLimit {
 		limit = skv.ScanMaxLimit
@@ -68,41 +103,6 @@ func (db *DB) Hscan(key, cursor, end []byte, limit uint64) *skv.Reply {
 	return rpl
 }
 
-func (db *DB) Hset(key, field, value []byte, uul uint64) *skv.Reply {
-
-	bkey := skv.HashKey(key, field)
-
-	if rs := db._raw_get(bkey); rs.Status == skv.ReplyNotFound {
-		db._raw_incrby(skv.HashLenKey(key), 1)
-	}
-
-	return db._raw_set(bkey, value, 0)
-}
-
-func (db *DB) HsetJson(key, field []byte, value interface{}, ttl uint64) *skv.Reply {
-
-	bkey := skv.HashKey(key, field)
-
-	if rs := db._raw_get(bkey); rs.Status == skv.ReplyNotFound {
-		db._raw_incrby(skv.HashLenKey(key), 1)
-	}
-
-	return db._raw_set_json(bkey, value, 0)
-}
-
-func (db *DB) Hdel(key, field []byte) *skv.Reply {
-
-	bkey := skv.HashKey(key, field)
-	rpl := skv.NewReply("")
-
-	if rs := db._raw_get(bkey); rs.Status == skv.ReplyOK {
-		db._raw_incrby(skv.HashLenKey(key), -1)
-		rpl = db._raw_del(bkey)
-	}
-
-	return rpl
-}
-
-func (db *DB) Hlen(key []byte) *skv.Reply {
+func (db *DB) HashLen(key []byte) *skv.Reply {
 	return db._raw_get(skv.HashLenKey(key))
 }

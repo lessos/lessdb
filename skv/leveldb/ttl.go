@@ -27,17 +27,17 @@ func (db *DB) ttl_worker() {
 
 		for {
 
-			ls := db.Zrange(skv.SetTtlPrefix(), 0, skv.TimeNowMS(), skv.TtlWorkerLimit).Hash()
+			ls := db.SsRange(skv.SetTtlPrefix(), 0, skv.TimeNowMS(), skv.TtlWorkerLimit).Hash()
 
 			for _, v := range ls {
 
 				wb := levigo.NewWriteBatch()
 				// wo := levigo.NewWriteOptions()
 
-				wb.Delete(skv.ZsetScoreKey(skv.SetTtlPrefix(), v.Key, v.Uint64()))
+				wb.Delete(skv.SortSetsScoreKey(skv.SetTtlPrefix(), v.Key, v.Uint64()))
 
-				if rs := db.Zget(skv.SetTtlPrefix(), v.Key).Uint64(); rs == v.Uint64() {
-					wb.Delete(skv.ZsetKey(skv.SetTtlPrefix(), v.Key))
+				if rs := db.SsGet(skv.SetTtlPrefix(), v.Key).Uint64(); rs == v.Uint64() {
+					wb.Delete(skv.SortSetsKey(skv.SetTtlPrefix(), v.Key))
 					wb.Delete(v.Key)
 				}
 
@@ -45,7 +45,7 @@ func (db *DB) ttl_worker() {
 				wb.Close()
 				// wo.Close()
 
-				db._raw_incrby(skv.ZsetLenKey(skv.SetTtlPrefix()), -1)
+				db._raw_incrby(skv.SortSetsLenKey(skv.SetTtlPrefix()), -1)
 			}
 
 			if uint64(len(ls)) < skv.TtlWorkerLimit {

@@ -85,7 +85,7 @@ func (db *DB) Hset(key, field, value []byte, ttl uint64) *skv.Reply {
 		db._raw_incrby(skv.HashLenKey(key), 1)
 	}
 
-	return db._raw_set(bkey, value, 0)
+	return db._raw_put(bkey, value, 0)
 }
 
 func (db *DB) HsetJson(key, field []byte, value interface{}, ttl uint64) *skv.Reply {
@@ -96,7 +96,7 @@ func (db *DB) HsetJson(key, field []byte, value interface{}, ttl uint64) *skv.Re
 		db._raw_incrby(skv.HashLenKey(key), 1)
 	}
 
-	return db._raw_set_json(bkey, value, 0)
+	return db._raw_put_json(bkey, value, 0)
 }
 
 func (db *DB) Hdel(key, field []byte) *skv.Reply {

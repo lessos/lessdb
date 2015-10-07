@@ -215,7 +215,7 @@ func (db *DB) ObjectDocSchemaSync(fold string, schema skv.ObjectDocSchema) *skv.
 
 	skey := string(key)
 
-	rpl = db._raw_set_json(skv.ObjectDocSchemaKey(key), schema, 0)
+	rpl = db._raw_put_json(skv.ObjectDocSchemaKey(key), schema, 0)
 	if rpl.Status == skv.ReplyOK {
 		_obj_doc_indexes[skey] = schema
 	}
@@ -227,7 +227,7 @@ func (db *DB) ObjectDocGet(fold, key string) *skv.Reply {
 	return db._raw_get(skv.NewObjectPathKey(fold, key).EntryIndex())
 }
 
-func (db *DB) ObjectDocSet(fold, key string, obj interface{}, ttl uint32) *skv.Reply {
+func (db *DB) ObjectDocPut(fold, key string, obj interface{}, ttl uint32) *skv.Reply {
 
 	_obj_doc_global_locker.Lock()
 	_obj_doc_global_locker.Unlock()
@@ -335,7 +335,7 @@ func (db *DB) ObjectDocSet(fold, key string, obj interface{}, ttl uint32) *skv.R
 			} else if incr_set > 0 && incr_set > incr_prev {
 
 				if db._raw_get(skv.ObjectDocIndexIncrKey(opath.Fold, siEntry.Seq)).Uint64() < incr_set {
-					db._raw_set(skv.ObjectDocIndexIncrKey(opath.Fold, siEntry.Seq), []byte(strconv.FormatUint(incr_set, 10)), 0)
+					db._raw_put(skv.ObjectDocIndexIncrKey(opath.Fold, siEntry.Seq), []byte(strconv.FormatUint(incr_set, 10)), 0)
 				}
 			}
 		}

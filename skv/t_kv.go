@@ -14,10 +14,6 @@
 
 package skv
 
-func SetKey(key []byte) []byte {
-	return append([]byte{ns_set_entry}, key...)
-}
-
-func SetTtlPrefix() []byte {
-	return ns_set_ttl
+func KvKey(key []byte) []byte {
+	return append([]byte{NsKvEntry}, key...)
 }

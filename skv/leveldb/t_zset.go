@@ -23,11 +23,11 @@ import (
 	"github.com/lessos/lessdb/skv"
 )
 
-func (db *DB) Zget(key, member []byte) *skv.Reply {
-	return db._raw_get(skv.ZsetKey(key, member))
+func (db *DB) SsGet(key, member []byte) *skv.Reply {
+	return db._raw_get(skv.SortSetsKey(key, member))
 }
 
-func (db *DB) Zset(key, member []byte, score uint64) *skv.Reply {
+func (db *DB) SortSets(key, member []byte, score uint64) *skv.Reply {
 
 	wb := levigo.NewWriteBatch()
 	defer wb.Close()
@@ -36,19 +36,19 @@ func (db *DB) Zset(key, member []byte, score uint64) *skv.Reply {
 	// defer wo.Close()
 
 	//
-	if prev := db.Zget(key, member); prev.Status == skv.ReplyOK && prev.Uint64() != score {
+	if prev := db.SsGet(key, member); prev.Status == skv.ReplyOK && prev.Uint64() != score {
 
-		wb.Delete(skv.ZsetScoreKey(key, member, prev.Uint64()))
+		wb.Delete(skv.SortSetsScoreKey(key, member, prev.Uint64()))
 
 	} else if prev.Status == skv.ReplyNotFound {
-		db._raw_incrby(skv.ZsetLenKey(key), 1)
+		db._raw_incrby(skv.SortSetsLenKey(key), 1)
 	}
 
 	//
-	wb.Put(skv.ZsetScoreKey(key, member, score), []byte{})
+	wb.Put(skv.SortSetsScoreKey(key, member, score), []byte{})
 
 	//
-	wb.Put(skv.ZsetKey(key, member), []byte(strconv.FormatUint(score, 10)))
+	wb.Put(skv.SortSetsKey(key, member), []byte(strconv.FormatUint(score, 10)))
 
 	rpl := skv.NewReply("")
 
@@ -59,11 +59,11 @@ func (db *DB) Zset(key, member []byte, score uint64) *skv.Reply {
 	return rpl
 }
 
-func (db *DB) Zrange(key []byte, score_start, score_end, limit uint64) *skv.Reply {
+func (db *DB) SsRange(key []byte, score_start, score_end, limit uint64) *skv.Reply {
 
 	var (
-		bs_start = skv.ZsetScoreKeyPrefix(key, score_start)
-		bs_end   = skv.ZsetScoreKeyPrefix(key, score_end)
+		bs_start = skv.SortSetsScoreKeyPrefix(key, score_start)
+		bs_end   = skv.SortSetsScoreKeyPrefix(key, score_end)
 		rpl      = skv.NewReply("")
 	)
 
@@ -108,7 +108,7 @@ func (db *DB) Zrange(key []byte, score_start, score_end, limit uint64) *skv.Repl
 	return rpl
 }
 
-func (db *DB) Zdel(key, member []byte) *skv.Reply {
+func (db *DB) SsDel(key, member []byte) *skv.Reply {
 
 	wb := levigo.NewWriteBatch()
 	defer wb.Close()
@@ -116,11 +116,11 @@ func (db *DB) Zdel(key, member []byte) *skv.Reply {
 	// wo := levigo.NewWriteOptions()
 	// defer wo.Close()
 
-	wb.Delete(skv.ZsetKey(key, member))
+	wb.Delete(skv.SortSetsKey(key, member))
 
-	if prev := db.Zget(key, member); prev.Status == skv.ReplyOK {
-		db._raw_incrby(skv.ZsetLenKey(key), -1)
-		wb.Delete(skv.ZsetScoreKey(key, member, prev.Uint64()))
+	if prev := db.SsGet(key, member); prev.Status == skv.ReplyOK {
+		db._raw_incrby(skv.SortSetsLenKey(key), -1)
+		wb.Delete(skv.SortSetsScoreKey(key, member, prev.Uint64()))
 	}
 
 	rpl := skv.NewReply("")
@@ -132,6 +132,6 @@ func (db *DB) Zdel(key, member []byte) *skv.Reply {
 	return rpl
 }
 
-func (db *DB) Zlen(key []byte) *skv.Reply {
-	return db._raw_get(skv.ZsetLenKey(key))
+func (db *DB) SsLen(key []byte) *skv.Reply {
+	return db._raw_get(skv.SortSetsLenKey(key))
 }

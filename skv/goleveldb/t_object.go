@@ -40,17 +40,10 @@ func (db *DB) ObjectGet(path string) *skv.Reply {
 	return db._raw_get(skv.NewObjectPathParse(path).EntryIndex())
 }
 
-func (db *DB) ObjectSet(path string, value interface{}, ttl uint32) *skv.Reply {
-	return db._object_set(skv.ObjectTypeGeneral, skv.NewObjectPathParse(path), value, ttl)
-}
-
-func (db *DB) ObjectDel(path string) *skv.Reply {
-	return db._object_del(skv.NewObjectPathParse(path))
-}
-
-func (db *DB) _object_set(otype byte, opath *skv.ObjectPath, value interface{}, ttl uint32) *skv.Reply {
+func (db *DB) ObjectPut(path string, value interface{}, ttl uint32) *skv.Reply {
 
 	var (
+		opath  = skv.NewObjectPathParse(path)
 		meta   skv.ObjectMeta
 		bkey   = opath.EntryIndex()
 		mkey   = opath.MetaIndex()
@@ -84,14 +77,17 @@ func (db *DB) _object_set(otype byte, opath *skv.ObjectPath, value interface{}, 
 
 	meta = db._raw_get(mkey).ObjectMeta()
 
-	db._obj_meta_sync(otype, &meta, opath, int64(len(bvalue)), ttl)
+	db._obj_meta_sync(skv.ObjectTypeGeneral, &meta, opath, int64(len(bvalue)), ttl)
 
-	return db._raw_set(bkey, append(meta.Export(), bvalue...), 0)
+	return db._raw_put(bkey, append(meta.Export(), bvalue...), 0)
 }
 
-func (db *DB) _object_del(opath *skv.ObjectPath) *skv.Reply {
+func (db *DB) ObjectDel(path string) *skv.Reply {
 
-	rpl := skv.NewReply("")
+	var (
+		rpl   = skv.NewReply("")
+		opath = skv.NewObjectPathParse(path)
+	)
 
 	if rs := db._raw_get(opath.MetaIndex()); rs.Status == skv.ReplyOK {
 
@@ -114,10 +110,6 @@ func (db *DB) _object_del(opath *skv.ObjectPath) *skv.Reply {
 
 func (db *DB) ObjectScan(fold, cursor, end string, limit uint32) *skv.Reply {
 
-	if limit > uint32(skv.ScanMaxLimit) {
-		limit = uint32(skv.ScanMaxLimit)
-	}
-
 	var (
 		prefix = skv.ObjectEntryFold(fold)
 		prelen = len(prefix)
@@ -128,6 +120,10 @@ func (db *DB) ObjectScan(fold, cursor, end string, limit uint32) *skv.Reply {
 
 	for i := len(cend); i < 256; i++ {
 		cend = append(cend, 0xff)
+	}
+
+	if limit > uint32(skv.ScanMaxLimit) {
+		limit = uint32(skv.ScanMaxLimit)
 	}
 
 	iter := db.ldb.NewIterator(&util.Range{Start: cstart, Limit: append(cend)}, nil)
@@ -167,10 +163,6 @@ func (db *DB) ObjectMetaGet(path string) *skv.Reply {
 
 func (db *DB) ObjectMetaScan(fold, cursor, end string, limit uint64) *skv.Reply {
 
-	if limit > skv.ScanMaxLimit {
-		limit = skv.ScanMaxLimit
-	}
-
 	var (
 		prefix = skv.ObjectMetaFold(fold)
 		prelen = len(prefix)
@@ -181,6 +173,10 @@ func (db *DB) ObjectMetaScan(fold, cursor, end string, limit uint64) *skv.Reply 
 
 	for i := len(cend); i < 256; i++ {
 		cend = append(cend, 0xff)
+	}
+
+	if limit > skv.ScanMaxLimit {
+		limit = skv.ScanMaxLimit
 	}
 
 	iter := db.ldb.NewIterator(&util.Range{Start: cstart, Limit: append(cend)}, nil)
@@ -288,7 +284,7 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 
 	if size >= 0 {
 
-		if ok := db._raw_set_ttl(skv.NsObjectEntry, []byte(opath.EntryPath()), ttl); !ok {
+		if ok := db._raw_ssttl_put(skv.NsObjectEntry, []byte(opath.EntryPath()), ttl); !ok {
 			return "ServerError TTL Set"
 		}
 

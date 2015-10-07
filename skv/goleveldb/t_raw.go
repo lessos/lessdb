@@ -28,6 +28,86 @@ var (
 	_raw_incr_locker sync.Mutex
 )
 
+func (db *DB) _raw_get(key []byte) *skv.Reply {
+
+	rpl := skv.NewReply("")
+
+	if data, err := db.ldb.Get(key, nil); err != nil {
+
+		if err.Error() == "leveldb: not found" {
+			rpl.Status = skv.ReplyNotFound
+		} else {
+			rpl.Status = err.Error()
+		}
+
+	} else {
+		rpl.Data = [][]byte{data}
+	}
+
+	return rpl
+}
+
+func (db *DB) _raw_put(key, value []byte, ttl uint32) *skv.Reply {
+
+	rpl := skv.NewReply("")
+
+	if len(key) < 2 {
+		rpl.Status = skv.ReplyInvalidArgument
+		return rpl
+	}
+
+	if ttl > 0 {
+
+		if ttl < 300 {
+			return rpl
+		}
+
+		switch key[0] {
+		case skv.NsKvEntry:
+			if ok := db._raw_ssttl_put(key[0], key[1:], ttl); !ok {
+				rpl.Status = skv.ReplyInvalidArgument
+				return rpl
+			}
+		default:
+			rpl.Status = skv.ReplyInvalidArgument
+			return rpl
+		}
+	}
+
+	if err := db.ldb.Put(key, value, nil); err != nil {
+		rpl.Status = err.Error()
+	}
+
+	return rpl
+}
+
+func (db *DB) _raw_put_json(key []byte, value interface{}, ttl uint32) *skv.Reply {
+
+	bvalue, err := skv.JsonEncode(value)
+	if err != nil {
+		return skv.NewReply(err.Error())
+	}
+
+	return db._raw_put(key, bvalue, ttl)
+}
+
+func (db *DB) _raw_del(keys ...[]byte) *skv.Reply {
+
+	rpl := skv.NewReply("")
+
+	batch := new(leveldb.Batch)
+
+	for _, key := range keys {
+		batch.Delete(key)
+	}
+
+	if err := db.ldb.Write(batch, nil); err != nil {
+		rpl.Status = err.Error()
+	}
+
+	return rpl
+}
+
 func (db *DB) _raw_scan(cursor, end []byte, limit uint64) *skv.Reply {
 
 	rpl := skv.NewReply("")
@@ -110,40 +190,59 @@ func (db *DB) _raw_revscan(cursor, end []byte, limit uint64) *skv.Reply {
 	return rpl
 }
 
-func (db *DB) _raw_set_json(key []byte, value interface{}, ttl uint64) *skv.Reply {
+func (db *DB) _raw_incrby(key []byte, step int64) *skv.Reply {
 
-	bvalue, err := skv.JsonEncode(value)
-	if err != nil {
-		return skv.NewReply(err.Error())
+	if step == 0 {
+		return skv.NewReply("")
 	}
 
-	return db._raw_set(key, bvalue, ttl)
-}
+	_raw_incr_locker.Lock()
+	defer _raw_incr_locker.Unlock()
 
-func (db *DB) _raw_set(key, value []byte, ttl uint64) *skv.Reply {
+	num := uint64(0)
 
-	rpl := skv.NewReply("")
-
-	if ttl > 0 {
-
-		if ttl < 300 {
-			return rpl
-		}
-
-		rpl = db.Zset(skv.SetTtlPrefix(), key, skv.TimeNowMS()+ttl)
-		if rpl.Status != skv.ReplyOK {
-			return rpl
-		}
+	if rs := db._raw_get(key); rs.Status == skv.ReplyOK {
+		num = rs.Uint64()
 	}
 
-	if err := db.ldb.Put(key, value, nil); err != nil {
-		rpl.Status = err.Error()
+	if step < 0 {
+
+		if uint64(-step) > num {
+			num = 0
+		} else {
+			num = num - uint64(-step)
+		}
+
+	} else {
+		num += uint64(step)
+	}
+
+	bnum := []byte(strconv.FormatUint(num, 10))
+	rpl := db._raw_put(key, bnum, 0)
+	if rpl.Status == skv.ReplyOK {
+		rpl.Data = append(rpl.Data, bnum)
 	}
 
 	return rpl
 }
 
-func (db *DB) _raw_set_ttl(ns byte, key []byte, ttl uint32) bool {
+func (db *DB) _raw_ssttl_get(ns byte, key []byte) *skv.Reply {
+
+	key = append([]byte{ns}, key...)
+
+	ttl := db._raw_get(skv.RawTtlEntry(key)).Int64() - int64(skv.TimeNowMS())
+	if ttl < 0 {
+		ttl = 0
+	}
+
+	rpl := skv.NewReply("")
+
+	rpl.Data = append(rpl.Data, []byte(strconv.FormatInt(ttl, 10)))
+
+	return rpl
+}
+
+func (db *DB) _raw_ssttl_put(ns byte, key []byte, ttl uint32) bool {
 
 	if len(key) > 200 {
 		return false
@@ -159,7 +258,6 @@ func (db *DB) _raw_set_ttl(ns byte, key []byte, ttl uint32) bool {
 
 		//
 		if prev := db._raw_get(skv.RawTtlEntry(key)); prev.Status == skv.ReplyOK && prev.Uint64() != tto {
-
 			batch.Delete(skv.RawTtlQueue(key, prev.Uint64()))
 		}
 
@@ -177,7 +275,7 @@ func (db *DB) _raw_set_ttl(ns byte, key []byte, ttl uint32) bool {
 	return true
 }
 
-func (db *DB) _raw_ttl_range(score_start, score_end, limit uint64) *skv.Reply {
+func (db *DB) _raw_ssttl_range(score_start, score_end, limit uint64) *skv.Reply {
 
 	var (
 		bs_start = skv.RawTtlQueuePrefix(score_start)
@@ -214,92 +312,6 @@ func (db *DB) _raw_ttl_range(score_start, score_end, limit uint64) *skv.Reply {
 
 	if iter.Error() != nil {
 		rpl.Status = iter.Error().Error()
-	}
-
-	return rpl
-}
-
-func (db *DB) _raw_ttl(key []byte) *skv.Reply {
-
-	ttl := db.Zget(skv.SetTtlPrefix(), key).Int64() - int64(skv.TimeNowMS())
-	if ttl < 0 {
-		ttl = -1
-	}
-
-	rpl := skv.NewReply("")
-
-	rpl.Data = append(rpl.Data, []byte(strconv.FormatInt(ttl, 10)))
-
-	return rpl
-}
-
-func (db *DB) _raw_incrby(key []byte, step int64) *skv.Reply {
-
-	if step == 0 {
-		return skv.NewReply("")
-	}
-
-	_raw_incr_locker.Lock()
-	defer _raw_incr_locker.Unlock()
-
-	num := uint64(0)
-
-	if rs := db._raw_get(key); rs.Status == skv.ReplyOK {
-		num = rs.Uint64()
-	}
-
-	if step < 0 {
-
-		if uint64(-step) > num {
-			num = 0
-		} else {
-			num = num - uint64(-step)
-		}
-
-	} else {
-		num += uint64(step)
-	}
-
-	bnum := []byte(strconv.FormatUint(num, 10))
-	rpl := db._raw_set(key, bnum, 0)
-	if rpl.Status == skv.ReplyOK {
-		rpl.Data = append(rpl.Data, bnum)
-	}
-
-	return rpl
-}
-
-func (db *DB) _raw_get(key []byte) *skv.Reply {
-
-	rpl := skv.NewReply("")
-
-	if data, err := db.ldb.Get(key, nil); err != nil {
-
-		if err.Error() == "leveldb: not found" {
-			rpl.Status = skv.ReplyNotFound
-		} else {
-			rpl.Status = err.Error()
-		}
-
-	} else {
-		rpl.Data = [][]byte{data}
-	}
-
-	return rpl
-}
-
-func (db *DB) _raw_del(keys ...[]byte) *skv.Reply {
-
-	rpl := skv.NewReply("")
-
-	batch := new(leveldb.Batch)
-
-	for _, key := range keys {
-		batch.Delete(key)
-	}
-
-	if err := db.ldb.Write(batch, nil); err != nil {
-		rpl.Status = err.Error()
 	}
 
 	return rpl

@@ -18,22 +18,22 @@ import (
 	"encoding/binary"
 )
 
-func ZsetKey(key, member []byte) []byte {
-	return append(RawKeyEncode(ns_zset_entry, key), member...)
+func SortSetsKey(key, member []byte) []byte {
+	return append(RawKeyEncode(ns_ss_entry, key), member...)
 }
 
-func ZsetLenKey(key []byte) []byte {
-	return RawKeyEncode(ns_zset_length, key)
+func SortSetsLenKey(key []byte) []byte {
+	return RawKeyEncode(ns_ss_length, key)
 }
 
-func ZsetScoreKeyPrefix(key []byte, score uint64) []byte {
+func SortSetsScoreKeyPrefix(key []byte, score uint64) []byte {
 
 	bscore := make([]byte, 8)
 	binary.BigEndian.PutUint64(bscore, score)
 
-	return append(RawKeyEncode(ns_zset_score, key), bscore...)
+	return append(RawKeyEncode(ns_ss_score, key), bscore...)
 }
 
-func ZsetScoreKey(key, member []byte, score uint64) []byte {
-	return append(ZsetScoreKeyPrefix(key, score), member...)
+func SortSetsScoreKey(key, member []byte, score uint64) []byte {
+	return append(SortSetsScoreKeyPrefix(key, score), member...)
 }
