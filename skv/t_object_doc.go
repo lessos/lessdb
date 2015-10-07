@@ -24,7 +24,7 @@ import (
 )
 
 func ObjectDocFoldKey(fold string) []byte {
-	return _obj_str_hash(ObjectPathClean(fold), obj_fold_len)
+	return _obj_str_hash(ObjectPathClean(fold), _obj_fold_len)
 }
 
 func ObjectDocSchemaKey(key []byte) []byte {

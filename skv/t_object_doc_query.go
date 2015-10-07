@@ -19,11 +19,11 @@ import (
 )
 
 const (
-	ObjectDocQueryFilterValues   uint8 = 0
-	ObjectDocQueryFilterRange    uint8 = 1
-	ObjectDocQueryOffsetMax            = 100000
-	ObjectDocQueryLimitMax             = 10000
-	_object_doc_query_filter_max       = 4
+	ObjectDocQueryFilterValues uint8 = 0
+	ObjectDocQueryFilterRange  uint8 = 1
+	ObjectDocQueryOffsetMax          = 100000
+	ObjectDocQueryLimitMax           = 10000
+	_obj_doc_query_filter_max        = 4
 )
 
 const (
@@ -56,7 +56,7 @@ func NewObjectDocQuery() *ObjectDocQuerySet {
 
 func (q *ObjectDocQuerySet) Filter(field string, values []string, exclude bool) *ObjectDocQuerySet {
 
-	if len(q.Filters) < _object_doc_query_filter_max {
+	if len(q.Filters) < _obj_doc_query_filter_max {
 
 		q.Filters = append(q.Filters, ObjectDocQueryFilter{
 			Type:    ObjectDocQueryFilterValues,

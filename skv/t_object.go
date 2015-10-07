@@ -34,8 +34,8 @@ const (
 	ObjectEventUpdated uint8 = 2
 	ObjectEventDeleted uint8 = 3
 
-	obj_fold_len  = 12
-	obj_field_len = 8
+	_obj_fold_len  = 12
+	_obj_field_len = 8
 )
 
 type ObjectEventHandler func(opath *ObjectPath, evtype uint8, version uint64)
@@ -45,7 +45,7 @@ type ObjectInterface interface {
 	ObjectEventRegister(ev ObjectEventHandler)
 	//
 	ObjectGet(path string) *Reply
-	ObjectSet(path string, value interface{}, ttl uint32) *Reply
+	ObjectPut(path string, value interface{}, ttl uint32) *Reply
 	ObjectDel(path string) *Reply
 	ObjectScan(fold, cursor, end string, limit uint32) *Reply
 	//
@@ -54,7 +54,15 @@ type ObjectInterface interface {
 	//
 	ObjectDocSchemaSync(fold string, schema ObjectDocSchema) *Reply
 	ObjectDocGet(fold, key string) *Reply
-	ObjectDocSet(fold, key string, value interface{}, ttl uint32) *Reply
+	ObjectDocPut(fold, key string, value interface{}, ttl uint32) *Reply
+	ObjectDocDel(fold, key string) *Reply
+	ObjectDocQuery(fold string, qry *ObjectDocQuerySet) *Reply
+}
+
+type ObjectDocInterface interface {
+	ObjectDocSchemaSync(fold string, schema ObjectDocSchema) *Reply
+	ObjectDocGet(fold, key string) *Reply
+	ObjectDocPut(fold, key string, value interface{}, ttl uint32) *Reply
 	ObjectDocDel(fold, key string) *Reply
 	ObjectDocQuery(fold string, qry *ObjectDocQuerySet) *Reply
 }
@@ -75,7 +83,6 @@ func (op *ObjectPath) MetaIndex() []byte {
 }
 
 func (op *ObjectPath) EntryPath() string {
-	// return ObjectPathClean(op.FoldName + "/" + hex.EncodeToString(op.Field))
 	return ObjectPathClean(op.FoldName + "/" + op.FieldName)
 }
 
@@ -89,7 +96,7 @@ func NewObjectPathKey(fold, key string) *ObjectPath {
 		FoldName: ObjectPathClean(fold),
 	}
 
-	op.Fold = _obj_str_hash(op.FoldName, obj_fold_len)
+	op.Fold = _obj_str_hash(op.FoldName, _obj_fold_len)
 
 	klen := len(key)
 	if klen > 32 {
@@ -116,8 +123,8 @@ func NewObjectPathParse(path string) *ObjectPath {
 		op.FoldName, op.FieldName = "", path
 	}
 
-	op.Fold = _obj_str_hash(op.FoldName, obj_fold_len)
-	op.Field = _obj_str_hash(op.FieldName, obj_field_len)
+	op.Fold = _obj_str_hash(op.FoldName, _obj_fold_len)
+	op.Field = _obj_str_hash(op.FieldName, _obj_field_len)
 
 	return op
 }
@@ -211,7 +218,6 @@ func ObjectRandomKey(length int) string {
 
 	io.ReadFull(rand.Reader, key)
 
-	// return fmt.Sprintf("%x", key)
 	return hex.EncodeToString(key)
 }
 
@@ -229,11 +235,11 @@ func ObjectHexString(key []byte) string {
 }
 
 func ObjectEntryFold(path string) []byte {
-	return _obj_entry_key_prefix(_obj_str_hash(ObjectPathClean(path), obj_fold_len))
+	return _obj_entry_key_prefix(_obj_str_hash(ObjectPathClean(path), _obj_fold_len))
 }
 
 func ObjectMetaFold(path string) []byte {
-	return _obj_entry_meta_prefix(_obj_str_hash(ObjectPathClean(path), obj_fold_len))
+	return _obj_entry_meta_prefix(_obj_str_hash(ObjectPathClean(path), _obj_fold_len))
 }
 
 func ObjectMetaParse(data []byte) ObjectMeta {
