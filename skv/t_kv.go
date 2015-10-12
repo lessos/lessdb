@@ -19,7 +19,7 @@ type KvInterface interface {
 	KvPut(key, value []byte, ttl uint32) *Reply
 	KvPutJson(key []byte, value interface{}, ttl uint32) *Reply
 	KvDel(keys ...[]byte) *Reply
-	KvScan(cursor, end []byte, limit uint64) *Reply
+	KvScan(cursor, end []byte, limit uint32) *Reply
 	KvIncrby(key []byte, step int64) *Reply
 	KvTtl(key []byte) *Reply
 }

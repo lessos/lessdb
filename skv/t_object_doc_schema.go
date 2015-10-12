@@ -29,8 +29,7 @@ const (
 	ObjectDocKeyLenMax             = 16
 	ObjectDocPriLenMax             = 16
 	ObjectDocSchemaMaxIndex        = 20
-	ObjectDocScanMax        uint64 = 10000
-	// _obj_doc_indexing              = false
+	ObjectDocScanMax        uint32 = 10000
 )
 
 type ObjectDocSchema struct {

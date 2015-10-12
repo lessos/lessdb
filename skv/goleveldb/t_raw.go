@@ -108,7 +108,7 @@ func (db *DB) _raw_del(keys ...[]byte) *skv.Reply {
 	return rpl
 }
 
-func (db *DB) _raw_scan(cursor, end []byte, limit uint64) *skv.Reply {
+func (db *DB) _raw_scan(cursor, end []byte, limit uint32) *skv.Reply {
 
 	rpl := skv.NewReply("")
 
@@ -147,7 +147,7 @@ func (db *DB) _raw_scan(cursor, end []byte, limit uint64) *skv.Reply {
 	return rpl
 }
 
-func (db *DB) _raw_revscan(cursor, end []byte, limit uint64) *skv.Reply {
+func (db *DB) _raw_revscan(cursor, end []byte, limit uint32) *skv.Reply {
 
 	rpl := skv.NewReply("")
 

@@ -160,7 +160,7 @@ func (db *DB) ObjectMetaGet(path string) *skv.Reply {
 	return db._raw_get(skv.NewObjectPathParse(path).MetaIndex())
 }
 
-func (db *DB) ObjectMetaScan(fold, cursor, end string, limit uint64) *skv.Reply {
+func (db *DB) ObjectMetaScan(fold, cursor, end string, limit uint32) *skv.Reply {
 
 	var (
 		prefix = skv.ObjectNsMetaFoldKey(fold)

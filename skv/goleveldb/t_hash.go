@@ -57,7 +57,7 @@ func (db *DB) HashDel(key, field []byte) *skv.Reply {
 	return skv.NewReply("")
 }
 
-func (db *DB) HashScan(key, cursor, end []byte, limit uint64) *skv.Reply {
+func (db *DB) HashScan(key, cursor, end []byte, limit uint32) *skv.Reply {
 
 	var (
 		prefix = skv.RawNsKeyEncode(skv.NsHashEntry, key)

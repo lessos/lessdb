@@ -90,7 +90,7 @@ func (db *DB) ObjectDocSchemaSync(fold string, schema skv.ObjectDocSchema) *skv.
 			// fmt.Println("WARN CLEAN prev INDEXES", pi.Column)
 			for {
 
-				rs := db._raw_scan(objIdxKeyPrefix, objIdxKeyPrefix, uint64(limit)).Hash()
+				rs := db._raw_scan(objIdxKeyPrefix, objIdxKeyPrefix, uint32(limit)).Hash()
 
 				if len(rs) > 0 {
 					batch := new(leveldb.Batch)
@@ -489,7 +489,7 @@ func (db *DB) ObjectDocQuery(fold string, qry *skv.ObjectDocQuerySet) *skv.Reply
 				}
 			}
 
-			if uint64(len(rs)) < skv.ObjectDocScanMax {
+			if uint32(len(rs)) < skv.ObjectDocScanMax {
 				break
 			}
 		}
@@ -573,7 +573,7 @@ func (db *DB) ObjectDocQuery(fold string, qry *skv.ObjectDocQuerySet) *skv.Reply
 				start = skv.ObjectDocBytesIncr(v.Key)
 			}
 
-			if uint64(len(rs)) < skv.ObjectDocScanMax {
+			if uint32(len(rs)) < skv.ObjectDocScanMax {
 				break
 			}
 		}

@@ -30,7 +30,7 @@ func (db *DB) KvPutJson(key []byte, value interface{}, ttl uint32) *skv.Reply {
 	return db._raw_put_json(skv.RawNsKeyConcat(skv.NsKvEntry, key), value, ttl)
 }
 
-func (db *DB) KvScan(cursor, end []byte, limit uint64) *skv.Reply {
+func (db *DB) KvScan(cursor, end []byte, limit uint32) *skv.Reply {
 
 	rpl := db._raw_scan(skv.RawNsKeyConcat(skv.NsKvEntry, cursor), skv.RawNsKeyConcat(skv.NsKvEntry, end), limit)
 

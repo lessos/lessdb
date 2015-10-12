@@ -22,7 +22,7 @@ const (
 
 	//
 	KeyLenMax    int    = 200
-	ScanLimitMax uint64 = 10000
+	ScanLimitMax uint32 = 10000
 
 	// Namespace
 	NsRawTtlEntry        = 0x08

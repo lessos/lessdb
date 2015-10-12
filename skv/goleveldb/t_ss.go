@@ -55,7 +55,7 @@ func (db *DB) SsPut(key, member []byte, score uint64) *skv.Reply {
 	return rpl
 }
 
-func (db *DB) SsRange(key []byte, score_start, score_end, limit uint64) *skv.Reply {
+func (db *DB) SsRange(key []byte, score_start, score_end uint64, limit uint32) *skv.Reply {
 
 	var (
 		bs_start = skv.SortSetsNsScorePrefix(key, score_start)

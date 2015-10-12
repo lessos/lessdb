@@ -18,7 +18,7 @@ type SsInterface interface {
 	SsGet(key, member []byte) *Reply
 	SsPut(key, member []byte, score uint64) *Reply
 	SsDel(key, member []byte) *Reply
-	SsRange(key []byte, score_start, score_end, limit uint64) *Reply
+	SsRange(key []byte, score_start, score_end uint64, limit uint32) *Reply
 	SsLen(key []byte) *Reply
 }
 

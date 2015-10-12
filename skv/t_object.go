@@ -42,7 +42,7 @@ type ObjectInterface interface {
 	ObjectScan(fold, cursor, end string, limit uint32) *Reply
 	//
 	ObjectMetaGet(path string) *Reply
-	ObjectMetaScan(fold, cursor, end string, limit uint64) *Reply
+	ObjectMetaScan(fold, cursor, end string, limit uint32) *Reply
 }
 
 type ObjectDocInterface interface {

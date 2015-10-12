@@ -19,7 +19,7 @@ type HashInterface interface {
 	HashPut(key, field, value []byte, ttl uint32) *Reply
 	HashPutJson(key, field []byte, value interface{}, ttl uint32) *Reply
 	HashDel(key, field []byte) *Reply
-	HashScan(key, cursor, end []byte, limit uint64) *Reply
+	HashScan(key, cursor, end []byte, limit uint32) *Reply
 	HashLen(key []byte) *Reply
 }
 
