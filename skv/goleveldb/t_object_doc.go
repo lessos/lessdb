@@ -200,7 +200,7 @@ func (db *DB) ObjectDocSchemaSync(fold string, schema skv.ObjectDocSchema) *skv.
 							break
 						}
 
-						offset = skv.ObjectHexString(entry.Key)
+						offset = skv.BytesToHexString(entry.Key)
 					}
 				}
 
@@ -248,13 +248,13 @@ func (db *DB) ObjectDocPut(fold, key string, obj interface{}, ttl uint32) *skv.R
 		bkey    = opath.EntryIndex()
 		objt    = reflect.TypeOf(obj)
 		objv    = reflect.ValueOf(obj)
-		prevobj skv.Object
 		prev    = map[string]interface{}{}
 		previdx = map[uint8]skv.ObjectDocSchemaIndexEntryBytes{}
 		set     = map[string]interface{}{}
 	)
 
-	if prevobj := db._raw_get(bkey).Object(); prevobj.Status == skv.ReplyOK {
+	prevobj := db._raw_get(bkey).Object()
+	if prevobj.Status == skv.ReplyOK {
 
 		if err := prevobj.JsonDecode(&prev); err == nil {
 			previdx = skv.ObjectDocIndexDataExport(_obj_doc_indexes, opath.Fold, prev)
@@ -294,7 +294,7 @@ func (db *DB) ObjectDocPut(fold, key string, obj interface{}, ttl uint32) *skv.R
 		var incr_set, incr_prev uint64
 
 		if siEntry.AutoIncr {
-			incr_set = skv.ObjectDocBytesToUint64(siEntry.Data)
+			incr_set = skv.BytesToUint64(siEntry.Data)
 		}
 
 		//
@@ -302,7 +302,7 @@ func (db *DB) ObjectDocPut(fold, key string, obj interface{}, ttl uint32) *skv.R
 
 			if siEntry.AutoIncr && incr_set == 0 {
 
-				if incr_prev = skv.ObjectDocBytesToUint64(piEntry.Data); incr_prev > 0 {
+				if incr_prev = skv.BytesToUint64(piEntry.Data); incr_prev > 0 {
 
 					siEntry.Data, incr_set = piEntry.Data, incr_prev
 
@@ -515,7 +515,7 @@ func (db *DB) ObjectDocQuery(fold string, qry *skv.ObjectDocQuerySet) *skv.Reply
 
 		for _, v := range filter.Values {
 
-			vb := skv.ObjectDocIndexSintToBytes(v, idx.Length)
+			vb := skv.SintToBytes(v, idx.Length)
 
 			dup := false
 			for _, pvb := range values {
@@ -615,7 +615,7 @@ func (db *DB) ObjectDocQuery(fold string, qry *skv.ObjectDocQuerySet) *skv.Reply
 	}
 
 	for i := qry.Offset; i < cutoff; i++ {
-		if rs := db.ObjectDocGet(fold, skv.ObjectHexString(sls[i])); rs.Status == skv.ReplyOK {
+		if rs := db.ObjectDocGet(fold, skv.BytesToHexString(sls[i])); rs.Status == skv.ReplyOK {
 			rpl.Data = append(rpl.Data, sls[i], rs.Bytes())
 		}
 	}

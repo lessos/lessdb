@@ -14,37 +14,25 @@
 
 package skv
 
-import (
-	"encoding/binary"
-)
+func RawNsKeyConcat(ns byte, key []byte) []byte {
+	return append([]byte{ns}, KeyLenFilter(key)...)
+}
 
-func RawKeyEncode(ns byte, key []byte) []byte {
+func RawNsKeyEncode(ns byte, key []byte) []byte {
 
-	si := len(key)
-	if si > 255 {
-		si = 255
-		key = key[:255]
-	}
+	k2 := KeyLenFilter(key)
 
-	return append([]byte{ns, uint8(si)}, key...)
+	return append([]byte{ns, uint8(len(k2))}, k2...)
 }
 
 func RawTtlEntry(key []byte) []byte {
-	return RawKeyEncode(NsRawTtlEntry, key)
+	return RawNsKeyConcat(NsRawTtlEntry, key)
 }
 
 func RawTtlQueuePrefix(ttl uint64) []byte {
-
-	bscore := make([]byte, 8)
-	binary.BigEndian.PutUint64(bscore, ttl)
-
-	return append([]byte{NsRawTtlQueue}, bscore...)
+	return RawNsKeyConcat(NsRawTtlQueue, _uint64_to_bytes(ttl))
 }
 
 func RawTtlQueue(key []byte, ttl uint64) []byte {
-
-	bscore := make([]byte, 8)
-	binary.BigEndian.PutUint64(bscore, ttl)
-
-	return append(append([]byte{NsRawTtlQueue}, bscore...), key...)
+	return append(RawTtlQueuePrefix(ttl), key...)
 }

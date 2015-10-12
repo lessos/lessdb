@@ -15,12 +15,7 @@
 package skv
 
 import (
-	"crypto/rand"
-	"crypto/sha1"
 	"encoding/binary"
-	"encoding/hex"
-	"io"
-	"path/filepath"
 	"strings"
 )
 
@@ -37,8 +32,6 @@ const (
 	_obj_field_len = 8
 )
 
-type ObjectEventHandler func(opath *ObjectPath, evtype uint8, version uint64)
-
 type ObjectInterface interface {
 	//
 	ObjectEventRegister(ev ObjectEventHandler)
@@ -50,12 +43,6 @@ type ObjectInterface interface {
 	//
 	ObjectMetaGet(path string) *Reply
 	ObjectMetaScan(fold, cursor, end string, limit uint64) *Reply
-	//
-	ObjectDocSchemaSync(fold string, schema ObjectDocSchema) *Reply
-	ObjectDocGet(fold, key string) *Reply
-	ObjectDocPut(fold, key string, value interface{}, ttl uint32) *Reply
-	ObjectDocDel(fold, key string) *Reply
-	ObjectDocQuery(fold string, qry *ObjectDocQuerySet) *Reply
 }
 
 type ObjectDocInterface interface {
@@ -66,6 +53,9 @@ type ObjectDocInterface interface {
 	ObjectDocQuery(fold string, qry *ObjectDocQuerySet) *Reply
 }
 
+type ObjectEventHandler func(opath *ObjectPath, evtype uint8, version uint64)
+
+//
 type ObjectPath struct {
 	Fold      []byte
 	FoldName  string
@@ -74,35 +64,36 @@ type ObjectPath struct {
 }
 
 func (op *ObjectPath) EntryIndex() []byte {
-	return append(_obj_entry_key_prefix(op.Fold), op.Field...)
+	return append(RawNsKeyEncode(NsObjectEntry, op.Fold), op.Field...)
 }
 
 func (op *ObjectPath) MetaIndex() []byte {
-	return append(_obj_entry_meta_prefix(op.Fold), op.Field...)
+	return append(RawNsKeyEncode(nsObjectMeta, op.Fold), op.Field...)
 }
 
 func (op *ObjectPath) EntryPath() string {
-	return ObjectPathClean(op.FoldName + "/" + op.FieldName)
+	return _filepath_clean(op.FoldName + "/" + op.FieldName)
 }
 
 func (op *ObjectPath) Parent() *ObjectPath {
 	return NewObjectPathParse(op.FoldName)
 }
 
+//
 func NewObjectPathKey(fold, key string) *ObjectPath {
 
 	op := &ObjectPath{
-		FoldName: ObjectPathClean(fold),
+		FoldName: _filepath_clean(fold),
 	}
 
-	op.Fold = _obj_str_hash(op.FoldName, _obj_fold_len)
+	op.Fold = _string_to_hash_bytes(op.FoldName, _obj_fold_len)
 
 	klen := len(key)
 	if klen > 32 {
 		klen = 32
 	}
 
-	if v, err := hex.DecodeString(key[:klen]); err == nil {
+	if v := HexStringToBytes(key[:klen]); len(v) > 0 {
 		op.Field = v
 		op.FieldName = key[:klen]
 	}
@@ -114,7 +105,7 @@ func NewObjectPathParse(path string) *ObjectPath {
 
 	op := &ObjectPath{}
 
-	path = ObjectPathClean(path)
+	path = _filepath_clean(path)
 
 	if i := strings.LastIndex(path, "/"); i > 0 {
 		op.FoldName, op.FieldName = path[:i], path[i+1:]
@@ -122,14 +113,22 @@ func NewObjectPathParse(path string) *ObjectPath {
 		op.FoldName, op.FieldName = "", path
 	}
 
-	op.Fold = _obj_str_hash(op.FoldName, _obj_fold_len)
-	op.Field = _obj_str_hash(op.FieldName, _obj_field_len)
+	op.Fold = _string_to_hash_bytes(op.FoldName, _obj_fold_len)
+	op.Field = _string_to_hash_bytes(op.FieldName, _obj_field_len)
 
 	return op
 }
 
+func ObjectNsEntryFoldKey(path string) []byte {
+	return RawNsKeyEncode(NsObjectEntry, _string_to_hash_bytes(_filepath_clean(path), _obj_fold_len))
+}
+
+func ObjectNsMetaFoldKey(path string) []byte {
+	return RawNsKeyEncode(nsObjectMeta, _string_to_hash_bytes(_filepath_clean(path), _obj_fold_len))
+}
+
 type Object struct {
-	EntryValue
+	entryValue
 	Status string
 	Meta   ObjectMeta
 	Key    []byte
@@ -173,113 +172,6 @@ type ObjectMeta struct {
 	Name     string `json:"name"`
 }
 
-func ObjectPathClean(path string) string {
-	return strings.Trim(filepath.Clean(path), "/")
-}
-
-func _obj_str_hash(str string, num int) []byte {
-
-	if num < 1 {
-		num = 1
-	} else if num > 32 {
-		num = 32
-	}
-
-	h := sha1.New()
-	io.WriteString(h, str)
-
-	return h.Sum(nil)[:num]
-}
-
-func _obj_entry_key_prefix(key []byte) []byte {
-
-	si := len(key)
-	if si > 255 {
-		si = 255
-	}
-
-	return append([]byte{NsObjectEntry, uint8(si)}, key[:si]...)
-}
-
-func _obj_entry_meta_prefix(key []byte) []byte {
-	return append([]byte{ns_object_meta, uint8(len(key))}, key...)
-}
-
-func ObjectRandomKey(length int) string {
-
-	if length < 1 {
-		length = 1
-	} else if length > 16 {
-		length = 16
-	}
-
-	key := make([]byte, length)
-
-	io.ReadFull(rand.Reader, key)
-
-	return hex.EncodeToString(key)
-}
-
-func ObjectStringHex(key string) []byte {
-
-	if v, err := hex.DecodeString(key); err == nil {
-		return v
-	}
-
-	return []byte{}
-}
-
-func ObjectHexString(key []byte) string {
-	return hex.EncodeToString(key)
-}
-
-func ObjectEntryFold(path string) []byte {
-	return _obj_entry_key_prefix(_obj_str_hash(ObjectPathClean(path), _obj_fold_len))
-}
-
-func ObjectMetaFold(path string) []byte {
-	return _obj_entry_meta_prefix(_obj_str_hash(ObjectPathClean(path), _obj_fold_len))
-}
-
-func ObjectMetaParse(data []byte) ObjectMeta {
-
-	m := ObjectMeta{}
-
-	if len(data) > 53 {
-
-		//
-		m.Type = data[0]
-		m.seek_len = int(binary.BigEndian.Uint16(data[1:3]))
-
-		//
-		m.Version = binary.BigEndian.Uint64(data[3:11])
-		m.Size = binary.BigEndian.Uint64(data[11:19])
-		m.Created = binary.BigEndian.Uint64(data[19:27])
-		m.Updated = binary.BigEndian.Uint64(data[27:35])
-
-		//
-		m.Group = binary.BigEndian.Uint32(data[35:39])
-		m.User = binary.BigEndian.Uint32(data[39:43])
-		m.Mode = data[43]
-		m.Ttl = binary.BigEndian.Uint32(data[44:48])
-
-		//
-		if m.Type == ObjectTypeFold {
-			m.Len = binary.BigEndian.Uint32(data[48:52])
-		} else if m.Type == ObjectTypeGeneral {
-			m.SumCheck = binary.BigEndian.Uint32(data[48:52])
-		}
-
-		//
-		if len(data) >= m.seek_len {
-			// m.NameLen = data[52]
-			m.Name = string(data[53:m.seek_len])
-		}
-	}
-
-	return m
-}
-
 func (m *ObjectMeta) Export() []byte {
 
 	data := make([]byte, 53)
@@ -320,4 +212,43 @@ func (m *ObjectMeta) Export() []byte {
 	binary.BigEndian.PutUint16(data[1:3], uint16(len(data)))
 
 	return data
+}
+
+func ObjectMetaParse(data []byte) ObjectMeta {
+
+	m := ObjectMeta{}
+
+	if len(data) > 53 {
+
+		//
+		m.Type = data[0]
+		m.seek_len = int(binary.BigEndian.Uint16(data[1:3]))
+
+		//
+		m.Version = binary.BigEndian.Uint64(data[3:11])
+		m.Size = binary.BigEndian.Uint64(data[11:19])
+		m.Created = binary.BigEndian.Uint64(data[19:27])
+		m.Updated = binary.BigEndian.Uint64(data[27:35])
+
+		//
+		m.Group = binary.BigEndian.Uint32(data[35:39])
+		m.User = binary.BigEndian.Uint32(data[39:43])
+		m.Mode = data[43]
+		m.Ttl = binary.BigEndian.Uint32(data[44:48])
+
+		//
+		if m.Type == ObjectTypeFold {
+			m.Len = binary.BigEndian.Uint32(data[48:52])
+		} else if m.Type == ObjectTypeGeneral {
+			m.SumCheck = binary.BigEndian.Uint32(data[48:52])
+		}
+
+		//
+		if len(data) >= m.seek_len {
+			// m.NameLen = data[52]
+			m.Name = string(data[53:m.seek_len])
+		}
+	}
+
+	return m
 }

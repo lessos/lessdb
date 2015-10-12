@@ -21,51 +21,30 @@ const (
 	GiB = MiB * 1024
 
 	//
-	TtlWorkerSleep        = 300e6
-	TtlWorkerLimit uint64 = 10000
-	ScanMaxLimit   uint64 = 10000
+	KeyLenMax    int    = 200
+	ScanLimitMax uint64 = 10000
 
-	//
-	NsRawTtlEntry           = 0x70
-	NsRawTtlQueue           = 0x71
-	NsKvEntry               = 0x80
-	ns_hash_entry           = 0x81
-	ns_hash_len             = 0x82
-	ns_ss_entry             = 0x83
-	ns_ss_score             = 0x84
-	ns_ss_length            = 0x85
-	ns_object_meta          = 0x90
-	NsObjectEntry           = 0x91
-	ns_object_doc_schema    = 0x92
-	ns_object_doc_index     = 0x93
-	ns_object_doc_increment = 0x94
+	// Namespace
+	NsRawTtlEntry        = 0x08
+	NsRawTtlQueue        = 0x09
+	NsKvEntry            = 0x10
+	NsHashEntry          = 0x20
+	NsHashLength         = 0x21
+	NsObjectEntry        = 0x30
+	nsObjectMeta         = 0x31
+	nsObjectDocSchema    = 0x38
+	nsObjectDocIndex     = 0x39
+	nsObjectDocIncrement = 0x3a
+	nsSsEntry            = 0x40
+	nsSsScore            = 0x41
+	nsSsLength           = 0x42
 )
 
 type DB interface {
-	// Key Value
-	KvGet(key []byte) *Reply
-	KvPut(key, value []byte, ttl uint32) *Reply
-	KvPutJson(key []byte, value interface{}, ttl uint32) *Reply
-	KvDel(keys ...[]byte) *Reply
-	KvScan(cursor, end []byte, limit uint64) *Reply
-	KvIncrby(key []byte, step int64) *Reply
-	KvTtl(key []byte) *Reply
-
-	// Hashs
-	HashGet(key, field []byte) *Reply
-	HashPut(key, field, value []byte, ttl uint32) *Reply
-	HashPutJson(key, field []byte, value interface{}, ttl uint32) *Reply
-	HashDel(key, field []byte) *Reply
-	HashScan(key, cursor, end []byte, limit uint64) *Reply
-	HashLen(key []byte) *Reply
-
-	// Sorted Sets
-	SsGet(key, member []byte) *Reply
-	SsPut(key, member []byte, score uint64) *Reply
-	SsDel(key, member []byte) *Reply
-	SsRange(key []byte, score_start, score_end, limit uint64) *Reply
-	SsLen(key []byte) *Reply
-
-	// Client APIs
+	KvInterface        // Key Value
+	HashInterface      // Hashs
+	SsInterface        // Sorted Sets
+	ObjectInterface    // Objects
+	ObjectDocInterface // Indexed Documents
 	Close()
 }

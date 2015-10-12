@@ -19,20 +19,20 @@ import (
 )
 
 func (db *DB) KvGet(key []byte) *skv.Reply {
-	return db._raw_get(skv.KvKey(key))
+	return db._raw_get(skv.RawNsKeyConcat(skv.NsKvEntry, key))
 }
 
 func (db *DB) KvPut(key, value []byte, ttl uint32) *skv.Reply {
-	return db._raw_put(skv.KvKey(key), value, ttl)
+	return db._raw_put(skv.RawNsKeyConcat(skv.NsKvEntry, key), value, ttl)
 }
 
 func (db *DB) KvPutJson(key []byte, value interface{}, ttl uint32) *skv.Reply {
-	return db._raw_put_json(skv.KvKey(key), value, ttl)
+	return db._raw_put_json(skv.RawNsKeyConcat(skv.NsKvEntry, key), value, ttl)
 }
 
 func (db *DB) KvScan(cursor, end []byte, limit uint64) *skv.Reply {
 
-	rpl := db._raw_scan(skv.KvKey(cursor), skv.KvKey(end), limit)
+	rpl := db._raw_scan(skv.RawNsKeyConcat(skv.NsKvEntry, cursor), skv.RawNsKeyConcat(skv.NsKvEntry, end), limit)
 
 	if len(rpl.Data) > 0 && len(rpl.Data)%2 == 0 {
 		for i := 0; i < len(rpl.Data); i += 2 {
@@ -46,14 +46,14 @@ func (db *DB) KvScan(cursor, end []byte, limit uint64) *skv.Reply {
 func (db *DB) KvDel(keys ...[]byte) *skv.Reply {
 
 	for k, v := range keys {
-		keys[k] = skv.KvKey(v)
+		keys[k] = skv.RawNsKeyConcat(skv.NsKvEntry, v)
 	}
 
 	return db._raw_del(keys...)
 }
 
 func (db *DB) KvIncrby(key []byte, step int64) *skv.Reply {
-	return db._raw_incrby(skv.KvKey(key), step)
+	return db._raw_incrby(skv.RawNsKeyConcat(skv.NsKvEntry, key), step)
 }
 
 func (db *DB) KvTtl(key []byte) *skv.Reply {

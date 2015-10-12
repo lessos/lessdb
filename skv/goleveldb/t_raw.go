@@ -120,8 +120,8 @@ func (db *DB) _raw_scan(cursor, end []byte, limit uint64) *skv.Reply {
 		end = append(end, 0xff)
 	}
 
-	if limit > skv.ScanMaxLimit {
-		limit = skv.ScanMaxLimit
+	if limit > skv.ScanLimitMax {
+		limit = skv.ScanLimitMax
 	}
 
 	iter := db.ldb.NewIterator(&util.Range{Start: cursor, Limit: end}, nil)
@@ -163,8 +163,8 @@ func (db *DB) _raw_revscan(cursor, end []byte, limit uint64) *skv.Reply {
 		end = append(end, 0xff)
 	}
 
-	if limit < skv.ScanMaxLimit {
-		limit = skv.ScanMaxLimit
+	if limit < skv.ScanLimitMax {
+		limit = skv.ScanLimitMax
 	}
 
 	iter := db.ldb.NewIterator(&util.Range{Start: cursor, Limit: end}, nil)
@@ -228,7 +228,7 @@ func (db *DB) _raw_incrby(key []byte, step int64) *skv.Reply {
 
 func (db *DB) _raw_ssttl_get(ns byte, key []byte) *skv.Reply {
 
-	key = append([]byte{ns}, key...)
+	key = skv.RawNsKeyConcat(ns, key)
 
 	ttl := db._raw_get(skv.RawTtlEntry(key)).Int64() - int64(skv.TimeNowMS())
 	if ttl < 0 {
@@ -244,11 +244,7 @@ func (db *DB) _raw_ssttl_get(ns byte, key []byte) *skv.Reply {
 
 func (db *DB) _raw_ssttl_put(ns byte, key []byte, ttl uint32) bool {
 
-	if len(key) > 200 {
-		return false
-	}
-
-	key = append([]byte{ns}, key...)
+	key = skv.RawNsKeyConcat(ns, key)
 
 	if ttl > 1000 {
 
@@ -303,7 +299,7 @@ func (db *DB) _raw_ssttl_range(score_start, score_end, limit uint64) *skv.Reply 
 		ui64 := binary.BigEndian.Uint64(iter.Key()[1:9])
 
 		rpl.Data = append(rpl.Data, skv.BytesClone(iter.Key()))
-		rpl.Data = append(rpl.Data, skv.BytesClone([]byte(strconv.FormatUint(ui64, 10))))
+		rpl.Data = append(rpl.Data, []byte(strconv.FormatUint(ui64, 10)))
 
 		limit--
 	}

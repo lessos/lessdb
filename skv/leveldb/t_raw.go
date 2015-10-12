@@ -39,8 +39,8 @@ func (db *DB) _raw_scan(cursor, end []byte, limit uint64) *skv.Reply {
 		end = append(end, 0xff)
 	}
 
-	if limit > skv.ScanMaxLimit {
-		limit = skv.ScanMaxLimit
+	if limit > skv.ScanLimitMax {
+		limit = skv.ScanLimitMax
 	}
 
 	// ro := levigo.NewReadOptions()
@@ -89,8 +89,8 @@ func (db *DB) _raw_revscan(cursor, end []byte, limit uint64) *skv.Reply {
 		end = append(end, 0x00)
 	}
 
-	if limit < skv.ScanMaxLimit {
-		limit = skv.ScanMaxLimit
+	if limit < skv.ScanLimitMax {
+		limit = skv.ScanLimitMax
 	}
 
 	// ro := levigo.NewReadOptions()

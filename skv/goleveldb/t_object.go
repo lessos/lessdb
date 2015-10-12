@@ -44,7 +44,6 @@ func (db *DB) ObjectPut(path string, value interface{}, ttl uint32) *skv.Reply {
 
 	var (
 		opath  = skv.NewObjectPathParse(path)
-		meta   skv.ObjectMeta
 		bkey   = opath.EntryIndex()
 		mkey   = opath.MetaIndex()
 		bvalue []byte
@@ -75,7 +74,7 @@ func (db *DB) ObjectPut(path string, value interface{}, ttl uint32) *skv.Reply {
 		return skv.NewReply(skv.ReplyInvalidArgument)
 	}
 
-	meta = db._raw_get(mkey).ObjectMeta()
+	meta := db._raw_get(mkey).ObjectMeta()
 
 	db._obj_meta_sync(skv.ObjectTypeGeneral, &meta, opath, int64(len(bvalue)), ttl)
 
@@ -111,10 +110,10 @@ func (db *DB) ObjectDel(path string) *skv.Reply {
 func (db *DB) ObjectScan(fold, cursor, end string, limit uint32) *skv.Reply {
 
 	var (
-		prefix = skv.ObjectEntryFold(fold)
+		prefix = skv.ObjectNsEntryFoldKey(fold)
 		prelen = len(prefix)
-		cstart = append(prefix, skv.ObjectStringHex(cursor)...)
-		cend   = append(prefix, skv.ObjectStringHex(end)...)
+		cstart = append(prefix, skv.HexStringToBytes(cursor)...)
+		cend   = append(prefix, skv.HexStringToBytes(end)...)
 		rpl    = skv.NewReply("")
 	)
 
@@ -122,8 +121,8 @@ func (db *DB) ObjectScan(fold, cursor, end string, limit uint32) *skv.Reply {
 		cend = append(cend, 0xff)
 	}
 
-	if limit > uint32(skv.ScanMaxLimit) {
-		limit = uint32(skv.ScanMaxLimit)
+	if limit > uint32(skv.ScanLimitMax) {
+		limit = uint32(skv.ScanLimitMax)
 	}
 
 	iter := db.ldb.NewIterator(&util.Range{Start: cstart, Limit: append(cend)}, nil)
@@ -164,10 +163,10 @@ func (db *DB) ObjectMetaGet(path string) *skv.Reply {
 func (db *DB) ObjectMetaScan(fold, cursor, end string, limit uint64) *skv.Reply {
 
 	var (
-		prefix = skv.ObjectMetaFold(fold)
+		prefix = skv.ObjectNsMetaFoldKey(fold)
 		prelen = len(prefix)
-		cstart = append(prefix, skv.ObjectStringHex(cursor)...)
-		cend   = append(prefix, skv.ObjectStringHex(end)...)
+		cstart = append(prefix, skv.HexStringToBytes(cursor)...)
+		cend   = append(prefix, skv.HexStringToBytes(end)...)
 		rpl    = skv.NewReply("")
 	)
 
@@ -175,8 +174,8 @@ func (db *DB) ObjectMetaScan(fold, cursor, end string, limit uint64) *skv.Reply 
 		cend = append(cend, 0xff)
 	}
 
-	if limit > skv.ScanMaxLimit {
-		limit = skv.ScanMaxLimit
+	if limit > skv.ScanLimitMax {
+		limit = skv.ScanLimitMax
 	}
 
 	iter := db.ldb.NewIterator(&util.Range{Start: cstart, Limit: append(cend)}, nil)

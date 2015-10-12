@@ -16,9 +16,16 @@ package skv
 
 import (
 	"bytes"
+	"crypto/rand"
+	"crypto/sha1"
+	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -41,14 +48,6 @@ func MetaTimeNow() uint64 {
 	return 0
 }
 
-func BytesClone(src []byte) []byte {
-
-	dst := make([]byte, len(src))
-	copy(dst, src)
-
-	return dst
-}
-
 func JsonDecode(src []byte, js interface{}) (err error) {
 
 	defer func() {
@@ -65,4 +64,109 @@ func JsonDecode(src []byte, js interface{}) (err error) {
 
 func JsonEncode(js interface{}) ([]byte, error) {
 	return json.Marshal(js)
+}
+
+func _filepath_clean(path string) string {
+	return strings.Trim(filepath.Clean(path), "/")
+}
+
+func BytesClone(src []byte) []byte {
+
+	dst := make([]byte, len(src))
+	copy(dst, src)
+
+	return dst
+}
+
+func RandomHexString(length int) string {
+
+	if length < 1 {
+		length = 1
+	} else if length > 16 {
+		length = 16
+	}
+
+	key := make([]byte, length)
+
+	io.ReadFull(rand.Reader, key)
+
+	return hex.EncodeToString(key)
+}
+
+func BytesToHexString(key []byte) string {
+	return hex.EncodeToString(key)
+}
+
+func HexStringToBytes(key string) []byte {
+
+	if v, err := hex.DecodeString(key); err == nil {
+		return v
+	}
+
+	return []byte{}
+}
+
+func BytesToUint64(key []byte) uint64 {
+
+	if len(key) < 1 || len(key) > 8 {
+		return 0
+	}
+
+	uibs := make([]byte, 8)
+
+	offset := 8 - len(key)
+
+	for i := 0; i < len(key); i++ {
+		uibs[i+offset] = key[i]
+	}
+
+	return binary.BigEndian.Uint64(uibs)
+}
+
+func SintToBytes(sint string, lg uint8) []byte {
+
+	if lg < 1 {
+		lg = 1
+	} else if lg > 8 {
+		lg = 8
+	}
+
+	ui64, _ := strconv.ParseUint(sint, 10, 64)
+
+	uibs := make([]byte, 8)
+
+	binary.BigEndian.PutUint64(uibs, ui64)
+
+	return uibs[8-lg:]
+}
+
+func _uint64_to_bytes(v uint64) []byte {
+
+	bs := make([]byte, 8)
+	binary.BigEndian.PutUint64(bs, v)
+
+	return bs
+}
+
+func _string_to_hash_bytes(str string, num int) []byte {
+
+	if num < 1 {
+		num = 1
+	} else if num > 20 {
+		num = 20
+	}
+
+	h := sha1.New()
+	io.WriteString(h, str)
+
+	return h.Sum(nil)[:num]
+}
+
+func KeyLenFilter(key []byte) []byte {
+
+	if len(key) < KeyLenMax {
+		return key
+	}
+
+	return key[:KeyLenMax]
 }

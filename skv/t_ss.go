@@ -14,26 +14,26 @@
 
 package skv
 
-import (
-	"encoding/binary"
-)
-
-func SortSetsKey(key, member []byte) []byte {
-	return append(RawKeyEncode(ns_ss_entry, key), member...)
+type SsInterface interface {
+	SsGet(key, member []byte) *Reply
+	SsPut(key, member []byte, score uint64) *Reply
+	SsDel(key, member []byte) *Reply
+	SsRange(key []byte, score_start, score_end, limit uint64) *Reply
+	SsLen(key []byte) *Reply
 }
 
-func SortSetsLenKey(key []byte) []byte {
-	return RawKeyEncode(ns_ss_length, key)
+func SortSetsNsEntryKey(key, member []byte) []byte {
+	return append(RawNsKeyEncode(nsSsEntry, key), member...)
 }
 
-func SortSetsScoreKeyPrefix(key []byte, score uint64) []byte {
-
-	bscore := make([]byte, 8)
-	binary.BigEndian.PutUint64(bscore, score)
-
-	return append(RawKeyEncode(ns_ss_score, key), bscore...)
+func SortSetsNsLengthKey(key []byte) []byte {
+	return RawNsKeyConcat(nsSsLength, key)
 }
 
-func SortSetsScoreKey(key, member []byte, score uint64) []byte {
-	return append(SortSetsScoreKeyPrefix(key, score), member...)
+func SortSetsNsScorePrefix(key []byte, score uint64) []byte {
+	return append(RawNsKeyEncode(nsSsScore, key), _uint64_to_bytes(score)...)
+}
+
+func SortSetsNsScoreKey(key, member []byte, score uint64) []byte {
+	return append(SortSetsNsScorePrefix(key, score), member...)
 }

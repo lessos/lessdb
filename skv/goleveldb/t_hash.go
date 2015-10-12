@@ -20,15 +20,15 @@ import (
 )
 
 func (db *DB) HashGet(key, field []byte) *skv.Reply {
-	return db._raw_get(skv.HashKey(key, field))
+	return db._raw_get(skv.HashNsEntryKey(key, field))
 }
 
 func (db *DB) HashPut(key, field, value []byte, ttl uint32) *skv.Reply {
 
-	bkey := skv.HashKey(key, field)
+	bkey := skv.HashNsEntryKey(key, field)
 
 	if rs := db._raw_get(bkey); rs.Status == skv.ReplyNotFound {
-		db._raw_incrby(skv.HashLenKey(key), 1)
+		db._raw_incrby(skv.HashNsLengthKey(key), 1)
 	}
 
 	return db._raw_put(bkey, value, 0)
@@ -36,10 +36,10 @@ func (db *DB) HashPut(key, field, value []byte, ttl uint32) *skv.Reply {
 
 func (db *DB) HashPutJson(key, field []byte, value interface{}, ttl uint32) *skv.Reply {
 
-	bkey := skv.HashKey(key, field)
+	bkey := skv.HashNsEntryKey(key, field)
 
 	if rs := db._raw_get(bkey); rs.Status == skv.ReplyNotFound {
-		db._raw_incrby(skv.HashLenKey(key), 1)
+		db._raw_incrby(skv.HashNsLengthKey(key), 1)
 	}
 
 	return db._raw_put_json(bkey, value, 0)
@@ -47,25 +47,20 @@ func (db *DB) HashPutJson(key, field []byte, value interface{}, ttl uint32) *skv
 
 func (db *DB) HashDel(key, field []byte) *skv.Reply {
 
-	bkey := skv.HashKey(key, field)
-	rpl := skv.NewReply("")
+	bkey := skv.HashNsEntryKey(key, field)
 
 	if rs := db._raw_get(bkey); rs.Status == skv.ReplyOK {
-		db._raw_incrby(skv.HashLenKey(key), -1)
-		rpl = db._raw_del(bkey)
+		db._raw_incrby(skv.HashNsLengthKey(key), -1)
+		return db._raw_del(bkey)
 	}
 
-	return rpl
+	return skv.NewReply("")
 }
 
 func (db *DB) HashScan(key, cursor, end []byte, limit uint64) *skv.Reply {
 
-	if limit > skv.ScanMaxLimit {
-		limit = skv.ScanMaxLimit
-	}
-
 	var (
-		prefix = skv.HashKeyPrefix(key)
+		prefix = skv.RawNsKeyEncode(skv.NsHashEntry, key)
 		prelen = len(prefix)
 		cstart = append(prefix, cursor...)
 		cend   = append(prefix, end...)
@@ -74,6 +69,10 @@ func (db *DB) HashScan(key, cursor, end []byte, limit uint64) *skv.Reply {
 
 	for i := len(cend); i < 256; i++ {
 		cend = append(cend, 0xff)
+	}
+
+	if limit > skv.ScanLimitMax {
+		limit = skv.ScanLimitMax
 	}
 
 	iter := db.ldb.NewIterator(&util.Range{Start: cstart, Limit: append(cend)}, nil)
@@ -104,5 +103,5 @@ func (db *DB) HashScan(key, cursor, end []byte, limit uint64) *skv.Reply {
 }
 
 func (db *DB) HashLen(key []byte) *skv.Reply {
-	return db._raw_get(skv.HashLenKey(key))
+	return db._raw_get(skv.HashNsLengthKey(key))
 }

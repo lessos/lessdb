@@ -14,26 +14,19 @@
 
 package skv
 
-func HashKeyPrefix(key []byte) []byte {
-
-	si := len(key)
-	if si > 255 {
-		si = 255
-	}
-
-	return append([]byte{ns_hash_entry, uint8(si)}, key...)
+type HashInterface interface {
+	HashGet(key, field []byte) *Reply
+	HashPut(key, field, value []byte, ttl uint32) *Reply
+	HashPutJson(key, field []byte, value interface{}, ttl uint32) *Reply
+	HashDel(key, field []byte) *Reply
+	HashScan(key, cursor, end []byte, limit uint64) *Reply
+	HashLen(key []byte) *Reply
 }
 
-func HashKey(key, field []byte) []byte {
-	return append(HashKeyPrefix(key), field...)
+func HashNsEntryKey(key, field []byte) []byte {
+	return append(RawNsKeyEncode(NsHashEntry, key), field...)
 }
 
-func HashLenKey(key []byte) []byte {
-
-	si := len(key)
-	if si > 255 {
-		si = 255
-	}
-
-	return append([]byte{ns_hash_len, uint8(si)}, key...)
+func HashNsLengthKey(key []byte) []byte {
+	return RawNsKeyConcat(NsHashLength, key)
 }

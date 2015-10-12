@@ -24,7 +24,7 @@ import (
 )
 
 func (db *DB) SsGet(key, member []byte) *skv.Reply {
-	return db._raw_get(skv.SortSetsKey(key, member))
+	return db._raw_get(skv.SortSetsNsEntryKey(key, member))
 }
 
 func (db *DB) SsPut(key, member []byte, score uint64) *skv.Reply {
@@ -34,17 +34,17 @@ func (db *DB) SsPut(key, member []byte, score uint64) *skv.Reply {
 	//
 	if prev := db.SsGet(key, member); prev.Status == skv.ReplyOK && prev.Uint64() != score {
 
-		batch.Delete(skv.SortSetsScoreKey(key, member, prev.Uint64()))
+		batch.Delete(skv.SortSetsNsScoreKey(key, member, prev.Uint64()))
 
 	} else if prev.Status == skv.ReplyNotFound {
-		db._raw_incrby(skv.SortSetsLenKey(key), 1)
+		db._raw_incrby(skv.SortSetsNsLengthKey(key), 1)
 	}
 
 	//
-	batch.Put(skv.SortSetsScoreKey(key, member, score), []byte{})
+	batch.Put(skv.SortSetsNsScoreKey(key, member, score), []byte{})
 
 	//
-	batch.Put(skv.SortSetsKey(key, member), []byte(strconv.FormatUint(score, 10)))
+	batch.Put(skv.SortSetsNsEntryKey(key, member), []byte(strconv.FormatUint(score, 10)))
 
 	rpl := skv.NewReply("")
 
@@ -58,8 +58,8 @@ func (db *DB) SsPut(key, member []byte, score uint64) *skv.Reply {
 func (db *DB) SsRange(key []byte, score_start, score_end, limit uint64) *skv.Reply {
 
 	var (
-		bs_start = skv.SortSetsScoreKeyPrefix(key, score_start)
-		bs_end   = skv.SortSetsScoreKeyPrefix(key, score_end)
+		bs_start = skv.SortSetsNsScorePrefix(key, score_start)
+		bs_end   = skv.SortSetsNsScorePrefix(key, score_end)
 		rpl      = skv.NewReply("")
 	)
 
@@ -101,11 +101,11 @@ func (db *DB) SsDel(key, member []byte) *skv.Reply {
 
 	batch := new(leveldb.Batch)
 
-	batch.Delete(skv.SortSetsKey(key, member))
+	batch.Delete(skv.SortSetsNsEntryKey(key, member))
 
 	if prev := db.SsGet(key, member); prev.Status == skv.ReplyOK {
-		db._raw_incrby(skv.SortSetsLenKey(key), -1)
-		batch.Delete(skv.SortSetsScoreKey(key, member, prev.Uint64()))
+		db._raw_incrby(skv.SortSetsNsLengthKey(key), -1)
+		batch.Delete(skv.SortSetsNsScoreKey(key, member, prev.Uint64()))
 	}
 
 	rpl := skv.NewReply("")
@@ -118,5 +118,5 @@ func (db *DB) SsDel(key, member []byte) *skv.Reply {
 }
 
 func (db *DB) SsLen(key []byte) *skv.Reply {
-	return db._raw_get(skv.SortSetsLenKey(key))
+	return db._raw_get(skv.SortSetsNsLengthKey(key))
 }

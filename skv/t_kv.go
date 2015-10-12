@@ -14,6 +14,12 @@
 
 package skv
 
-func KvKey(key []byte) []byte {
-	return append([]byte{NsKvEntry}, key...)
+type KvInterface interface {
+	KvGet(key []byte) *Reply
+	KvPut(key, value []byte, ttl uint32) *Reply
+	KvPutJson(key []byte, value interface{}, ttl uint32) *Reply
+	KvDel(keys ...[]byte) *Reply
+	KvScan(cursor, end []byte, limit uint64) *Reply
+	KvIncrby(key []byte, step int64) *Reply
+	KvTtl(key []byte) *Reply
 }

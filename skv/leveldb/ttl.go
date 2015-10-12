@@ -21,23 +21,28 @@ import (
 	"github.com/lessos/lessdb/skv"
 )
 
+const (
+	_ttl_worker_sleep        = 200e6
+	_ttl_worker_limit uint64 = 10000
+)
+
 func (db *DB) ttl_worker() {
 
 	go func() {
 
 		for {
 
-			ls := db.SsRange(skv.SetTtlPrefix(), 0, skv.TimeNowMS(), skv.TtlWorkerLimit).Hash()
+			ls := db.SsRange(skv.SetTtlPrefix(), 0, skv.TimeNowMS(), _ttl_worker_limit).Hash()
 
 			for _, v := range ls {
 
 				wb := levigo.NewWriteBatch()
 				// wo := levigo.NewWriteOptions()
 
-				wb.Delete(skv.SortSetsScoreKey(skv.SetTtlPrefix(), v.Key, v.Uint64()))
+				wb.Delete(skv.SortSetsNsScoreKey(skv.SetTtlPrefix(), v.Key, v.Uint64()))
 
 				if rs := db.SsGet(skv.SetTtlPrefix(), v.Key).Uint64(); rs == v.Uint64() {
-					wb.Delete(skv.SortSetsKey(skv.SetTtlPrefix(), v.Key))
+					wb.Delete(skv.SortSetsNsEntryKey(skv.SetTtlPrefix(), v.Key))
 					wb.Delete(v.Key)
 				}
 
@@ -45,11 +50,11 @@ func (db *DB) ttl_worker() {
 				wb.Close()
 				// wo.Close()
 
-				db._raw_incrby(skv.SortSetsLenKey(skv.SetTtlPrefix()), -1)
+				db._raw_incrby(skv.SortSetsNsLengthKey(skv.SetTtlPrefix()), -1)
 			}
 
-			if uint64(len(ls)) < skv.TtlWorkerLimit {
-				time.Sleep(skv.TtlWorkerSleep)
+			if uint64(len(ls)) < _ttl_worker_limit {
+				time.Sleep(_ttl_worker_sleep)
 			}
 		}
 	}()

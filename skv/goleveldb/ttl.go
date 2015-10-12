@@ -21,13 +21,18 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
+const (
+	_ttl_worker_sleep        = 200e6
+	_ttl_worker_limit uint64 = 10000
+)
+
 func (db *DB) ttl_worker() {
 
 	go func() {
 
 		for {
 
-			ls := db._raw_ssttl_range(0, skv.TimeNowMS(), skv.TtlWorkerLimit).Hash()
+			ls := db._raw_ssttl_range(0, skv.TimeNowMS(), _ttl_worker_limit).Hash()
 
 			for _, v := range ls {
 
@@ -52,8 +57,8 @@ func (db *DB) ttl_worker() {
 				db.ldb.Write(batch, nil)
 			}
 
-			if uint64(len(ls)) < skv.TtlWorkerLimit {
-				time.Sleep(skv.TtlWorkerSleep)
+			if uint64(len(ls)) < _ttl_worker_limit {
+				time.Sleep(_ttl_worker_sleep)
 			}
 		}
 	}()

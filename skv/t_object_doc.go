@@ -15,32 +15,26 @@
 package skv
 
 import (
-	"crypto/sha1"
 	"encoding/binary"
-	"io"
 	"reflect"
 	"strconv"
 	"strings"
 )
 
 func ObjectDocFoldKey(fold string) []byte {
-	return _obj_str_hash(ObjectPathClean(fold), _obj_fold_len)
+	return _string_to_hash_bytes(_filepath_clean(fold), _obj_fold_len)
 }
 
 func ObjectDocSchemaKey(key []byte) []byte {
-	return RawKeyEncode(ns_object_doc_schema, key)
-}
-
-func _object_doc_idx_key_prefix(key []byte) []byte {
-	return RawKeyEncode(ns_object_doc_index, key)
+	return RawNsKeyEncode(nsObjectDocSchema, key)
 }
 
 func ObjectDocIndexFieldPrefix(key []byte, column uint8) []byte {
-	return append(_object_doc_idx_key_prefix(key), column)
+	return append(RawNsKeyEncode(nsObjectDocIndex, key), column)
 }
 
 func ObjectDocIndexIncrKey(key []byte, column uint8) []byte {
-	return append(RawKeyEncode(ns_object_doc_increment, key), column)
+	return append(RawNsKeyEncode(nsObjectDocIncrement, key), column)
 }
 
 func ObjectDocBytesIncr(key []byte) []byte {
@@ -90,50 +84,8 @@ func ObjectDocIndexRawKeyExport(data []byte, ilen uint8) ([]byte, []byte, bool) 
 	return data[kplen:pken], data[pken:], true
 }
 
-func ObjectDocBytesToUint64(key []byte) uint64 {
-
-	if len(key) < 1 || len(key) > 8 {
-		return 0
-	}
-
-	uibs := make([]byte, 8)
-
-	offset := 8 - len(key)
-
-	for i := 0; i < len(key); i++ {
-		uibs[i+offset] = key[i]
-	}
-
-	return binary.BigEndian.Uint64(uibs)
-}
-
 func ObjectDocIndexStringFilter(key string) string {
 	return strings.ToLower(strings.TrimSpace(key))
-}
-
-func _object_doc_idx_string_to_bytes(key string) []byte {
-
-	h := sha1.New()
-	io.WriteString(h, key)
-
-	return h.Sum(nil)
-}
-
-func ObjectDocIndexSintToBytes(sint string, lg uint8) []byte {
-
-	if lg < 1 {
-		lg = 1
-	} else if lg > 8 {
-		lg = 8
-	}
-
-	ui64, _ := strconv.ParseUint(sint, 10, 64)
-
-	uibs := make([]byte, 8)
-
-	binary.BigEndian.PutUint64(uibs, ui64)
-
-	return uibs[8-lg:]
 }
 
 func ObjectDocIndexValue(idx *ObjectDocSchemaIndexEntry, value reflect.Value) ([]byte, bool) {
@@ -177,7 +129,7 @@ func ObjectDocIndexValue(idx *ObjectDocSchemaIndexEntry, value reflect.Value) ([
 		if idx.Type == ObjectDocSchemaIndexTypeUint {
 			ui64, _ = strconv.ParseUint(value.String(), 10, 64)
 		} else {
-			bs = _object_doc_idx_string_to_bytes(ObjectDocIndexStringFilter(value.String()))
+			bs = _string_to_hash_bytes(ObjectDocIndexStringFilter(value.String()), 20)
 		}
 
 	//
