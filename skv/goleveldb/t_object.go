@@ -26,6 +26,7 @@ import (
 var (
 	_obj_meta_locker   sync.Mutex
 	_obj_event_handler skv.ObjectEventHandler
+	_obj_options_def   = &skv.ObjectPutOptions{}
 )
 
 func (db *DB) ObjectEventRegister(ev skv.ObjectEventHandler) {
@@ -40,7 +41,7 @@ func (db *DB) ObjectGet(path string) *skv.Reply {
 	return db._raw_get(skv.NewObjectPathParse(path).EntryIndex())
 }
 
-func (db *DB) ObjectPut(path string, value interface{}, ttl uint32) *skv.Reply {
+func (db *DB) ObjectPut(path string, value interface{}, opts *skv.ObjectPutOptions) *skv.Reply {
 
 	var (
 		opath  = skv.NewObjectPathParse(path)
@@ -48,6 +49,10 @@ func (db *DB) ObjectPut(path string, value interface{}, ttl uint32) *skv.Reply {
 		mkey   = opath.MetaIndex()
 		bvalue []byte
 	)
+
+	if opts == nil {
+		opts = _obj_options_def
+	}
 
 	switch value.(type) {
 
@@ -76,7 +81,7 @@ func (db *DB) ObjectPut(path string, value interface{}, ttl uint32) *skv.Reply {
 
 	meta := db._raw_get(mkey).ObjectMeta()
 
-	db._obj_meta_sync(skv.ObjectTypeGeneral, &meta, opath, int64(len(bvalue)), ttl)
+	db._obj_meta_sync(skv.ObjectTypeGeneral, &meta, opath, int64(len(bvalue)), opts)
 
 	return db._raw_put(bkey, append(meta.Export(), bvalue...), 0)
 }
@@ -97,7 +102,7 @@ func (db *DB) ObjectDel(path string) *skv.Reply {
 
 		ms := rs.ObjectMeta()
 
-		db._obj_meta_sync(ms.Type, &ms, opath, -1, 0)
+		db._obj_meta_sync(ms.Type, &ms, opath, -1, _obj_options_def)
 
 		if _obj_event_handler != nil {
 			_obj_event_handler(opath, skv.ObjectEventDeleted, 0)
@@ -205,7 +210,7 @@ func (db *DB) ObjectMetaScan(fold, cursor, end string, limit uint32) *skv.Reply 
 	return rpl
 }
 
-func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.ObjectPath, size int64, ttl uint32) string {
+func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.ObjectPath, size int64, opts *skv.ObjectPutOptions) string {
 
 	//
 	if meta.Type > 0 {
@@ -217,7 +222,7 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 	//
 	if size >= 0 {
 
-		meta.Version = 0
+		meta.Version = opts.Version
 
 		//
 		if meta.Created < 1 {
@@ -248,8 +253,78 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 	}
 
 	//
+	if (size >= 0 && fold_meta.Type < 1) || size < 0 {
+
+		pfp := fold_path.Parent()
+
+		for {
+
+			if pfp.FoldName == "" && pfp.FieldName == "" {
+				break
+			}
+
+			//
+			pfp_meta := db._raw_get(pfp.MetaIndex()).ObjectMeta()
+			if pfp_meta.Type > 0 && pfp_meta.Type != skv.ObjectTypeFold {
+				return skv.ReplyInvalidArgument
+			}
+
+			pfp_meta.Version = opts.Version
+
+			if pfp_meta.Type < 1 {
+				pfp_meta.Name = pfp.FieldName
+			}
+
+			if pfp_meta.Created < 1 {
+				pfp_meta.Created = skv.MetaTimeNow()
+			}
+			pfp_meta.Updated = skv.MetaTimeNow()
+
+			//
+			found := false
+			if pfp_meta.Type > 0 {
+				found = true
+			}
+
+			if size >= 0 {
+
+				pfp_meta.Len++
+
+				pfp_meta.Type = skv.ObjectTypeFold
+
+				db._raw_put(pfp.EntryIndex(), pfp_meta.Export(), 0)
+				db._raw_put(pfp.MetaIndex(), pfp_meta.Export(), 0)
+
+				if found {
+					break
+				}
+
+			} else if found {
+
+				if pfp_meta.Len > 1 {
+
+					pfp_meta.Len--
+
+					db._raw_put(pfp.EntryIndex(), pfp_meta.Export(), 0)
+					db._raw_put(pfp.MetaIndex(), pfp_meta.Export(), 0)
+
+					break
+				}
+
+				db._raw_del(pfp.EntryIndex(), pfp.MetaIndex())
+
+			} else {
+				break
+			}
+
+			pfp = pfp.Parent()
+		}
+	}
+
+	//
 	fold_meta.Type = skv.ObjectTypeFold
 	fold_meta.Name = fold_path.FieldName
+	fold_meta.Version = opts.Version
 
 	//
 	if size >= 0 && meta.Type < 1 {
@@ -283,7 +358,7 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 
 	if size >= 0 {
 
-		if ok := db._raw_ssttl_put(skv.NsObjectEntry, []byte(opath.EntryPath()), ttl); !ok {
+		if ok := db._raw_ssttl_put(skv.NsObjectEntry, []byte(opath.EntryPath()), opts.Ttl); !ok {
 			return "ServerError TTL Set"
 		}
 
@@ -295,10 +370,15 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 
 	if fold_meta.Len < 1 {
 		batch.Delete(fold_path.MetaIndex())
+
+		// fmt.Println("\t#### fs dir del", fold_path.EntryPath(), fold_meta.Len)
 	} else {
 		batch.Put(fold_path.MetaIndex(), fold_meta.Export())
+
+		// fmt.Println("\t#### fs dir add", fold_path.EntryPath(), fold_meta.Len, opath.EntryPath(), meta.Version, skv.MetaTimeNow())
 	}
 
+	//
 	if err := db.ldb.Write(batch, nil); err != nil {
 		return err.Error()
 	}

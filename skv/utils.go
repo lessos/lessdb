@@ -67,7 +67,7 @@ func JsonEncode(js interface{}) ([]byte, error) {
 }
 
 func _filepath_clean(path string) string {
-	return strings.Trim(filepath.Clean(path), "/")
+	return strings.Trim(strings.Trim(filepath.Clean(path), "/"), ".")
 }
 
 func BytesClone(src []byte) []byte {

@@ -227,7 +227,7 @@ func (db *DB) ObjectDocGet(fold, key string) *skv.Reply {
 	return db._raw_get(skv.NewObjectPathKey(fold, key).EntryIndex())
 }
 
-func (db *DB) ObjectDocPut(fold, key string, obj interface{}, ttl uint32) *skv.Reply {
+func (db *DB) ObjectDocPut(fold, key string, obj interface{}, opts *skv.ObjectPutOptions) *skv.Reply {
 
 	_obj_doc_global_locker.Lock()
 	_obj_doc_global_locker.Unlock()
@@ -252,6 +252,10 @@ func (db *DB) ObjectDocPut(fold, key string, obj interface{}, ttl uint32) *skv.R
 		previdx = map[uint8]skv.ObjectDocSchemaIndexEntryBytes{}
 		set     = map[string]interface{}{}
 	)
+
+	if opts == nil {
+		opts = _obj_options_def
+	}
 
 	prevobj := db._raw_get(bkey).Object()
 	if prevobj.Status == skv.ReplyOK {
@@ -367,7 +371,7 @@ func (db *DB) ObjectDocPut(fold, key string, obj interface{}, ttl uint32) *skv.R
 	}
 
 	bvalue, _ := skv.JsonEncode(set)
-	db._obj_meta_sync(skv.ObjectTypeDocument, &prevobj.Meta, opath, int64(len(bvalue)), 0)
+	db._obj_meta_sync(skv.ObjectTypeDocument, &prevobj.Meta, opath, int64(len(bvalue)), _obj_options_def)
 
 	batch.Put(bkey, append(prevobj.Meta.Export(), bvalue...))
 
@@ -418,7 +422,7 @@ func (db *DB) ObjectDocDel(fold, key string) *skv.Reply {
 	if err := db.ldb.Write(batch, nil); err != nil {
 		rpl.Status = err.Error()
 	} else {
-		db._obj_meta_sync(prevobj.Meta.Type, &prevobj.Meta, opath, -1, 0)
+		db._obj_meta_sync(prevobj.Meta.Type, &prevobj.Meta, opath, -1, _obj_options_def)
 
 		// if _obj_event_handler != nil {
 		//     _obj_event_handler(opath, skv.ObjectEventDeleted, 0)

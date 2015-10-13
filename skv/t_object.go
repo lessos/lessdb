@@ -37,7 +37,7 @@ type ObjectInterface interface {
 	ObjectEventRegister(ev ObjectEventHandler)
 	//
 	ObjectGet(path string) *Reply
-	ObjectPut(path string, value interface{}, ttl uint32) *Reply
+	ObjectPut(path string, value interface{}, opts *ObjectPutOptions) *Reply
 	ObjectDel(path string) *Reply
 	ObjectScan(fold, cursor, end string, limit uint32) *Reply
 	//
@@ -48,12 +48,19 @@ type ObjectInterface interface {
 type ObjectDocInterface interface {
 	ObjectDocSchemaSync(fold string, schema ObjectDocSchema) *Reply
 	ObjectDocGet(fold, key string) *Reply
-	ObjectDocPut(fold, key string, value interface{}, ttl uint32) *Reply
+	ObjectDocPut(fold, key string, value interface{}, opts *ObjectPutOptions) *Reply
 	ObjectDocDel(fold, key string) *Reply
 	ObjectDocQuery(fold string, qry *ObjectDocQuerySet) *Reply
 }
 
 type ObjectEventHandler func(opath *ObjectPath, evtype uint8, version uint64)
+
+type ObjectPutOptions struct {
+	Ttl            uint32
+	Version        uint64
+	JournalEnable  bool
+	PlacementGroup uint32
+}
 
 //
 type ObjectPath struct {
