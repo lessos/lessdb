@@ -28,8 +28,8 @@ const (
 	ObjectEventUpdated uint8 = 2
 	ObjectEventDeleted uint8 = 3
 
-	_obj_fold_len  = 12
-	_obj_field_len = 8
+	ObjectFoldLength  = 12
+	ObjectFieldLength = 8
 )
 
 type ObjectInterface interface {
@@ -43,6 +43,7 @@ type ObjectInterface interface {
 	//
 	ObjectMetaGet(path string) *Reply
 	ObjectMetaScan(fold, cursor, end string, limit uint32) *Reply
+	ObjectJournalScan(place_pool, place_group uint32, start, end uint64, limit uint32) *Reply
 }
 
 type ObjectDocInterface interface {
@@ -56,10 +57,11 @@ type ObjectDocInterface interface {
 type ObjectEventHandler func(opath *ObjectPath, evtype uint8, version uint64)
 
 type ObjectPutOptions struct {
-	Ttl            uint32
-	Version        uint64
-	JournalEnable  bool
-	PlacementGroup uint32
+	Ttl           uint32
+	Version       uint64
+	JournalEnable bool
+	// PlacePool     uint32
+	// PlaceGroup    uint32
 }
 
 //
@@ -71,11 +73,11 @@ type ObjectPath struct {
 }
 
 func (op *ObjectPath) EntryIndex() []byte {
-	return append(RawNsKeyEncode(NsObjectEntry, op.Fold), op.Field...)
+	return append(RawNsKeyConcat(NsObjectEntry, op.Fold), op.Field...)
 }
 
 func (op *ObjectPath) MetaIndex() []byte {
-	return append(RawNsKeyEncode(nsObjectMeta, op.Fold), op.Field...)
+	return append(RawNsKeyConcat(NsObjectMeta, op.Fold), op.Field...)
 }
 
 func (op *ObjectPath) EntryPath() string {
@@ -86,6 +88,20 @@ func (op *ObjectPath) Parent() *ObjectPath {
 	return NewObjectPathParse(op.FoldName)
 }
 
+func (op *ObjectPath) PlacePool() []byte {
+
+	r := op.FoldName
+	if i := strings.LastIndex(op.FoldName, "/"); i > 0 {
+		r = op.FoldName[:i]
+	}
+
+	return _string_to_hash_bytes(r, 4) // 2^32
+}
+
+func (op *ObjectPath) PlaceGroup() []byte {
+	return op.Fold[:4] // 2^32
+}
+
 //
 func NewObjectPathKey(fold, key string) *ObjectPath {
 
@@ -93,7 +109,7 @@ func NewObjectPathKey(fold, key string) *ObjectPath {
 		FoldName: _filepath_clean(fold),
 	}
 
-	op.Fold = _string_to_hash_bytes(op.FoldName, _obj_fold_len)
+	op.Fold = _string_to_hash_bytes(op.FoldName, ObjectFoldLength)
 
 	klen := len(key)
 	if klen > 32 {
@@ -120,18 +136,22 @@ func NewObjectPathParse(path string) *ObjectPath {
 		op.FoldName, op.FieldName = "", path
 	}
 
-	op.Fold = _string_to_hash_bytes(op.FoldName, _obj_fold_len)
-	op.Field = _string_to_hash_bytes(op.FieldName, _obj_field_len)
+	op.Fold = _string_to_hash_bytes(op.FoldName, ObjectFoldLength)
+	op.Field = _string_to_hash_bytes(op.FieldName, ObjectFieldLength)
 
 	return op
 }
 
 func ObjectNsEntryFoldKey(path string) []byte {
-	return RawNsKeyEncode(NsObjectEntry, _string_to_hash_bytes(_filepath_clean(path), _obj_fold_len))
+	return RawNsKeyConcat(NsObjectEntry, _string_to_hash_bytes(_filepath_clean(path), ObjectFoldLength))
 }
 
 func ObjectNsMetaFoldKey(path string) []byte {
-	return RawNsKeyEncode(nsObjectMeta, _string_to_hash_bytes(_filepath_clean(path), _obj_fold_len))
+	return RawNsKeyConcat(NsObjectMeta, _string_to_hash_bytes(_filepath_clean(path), ObjectFoldLength))
+}
+
+func ObjectNsJournalKey(place_pool, place_group []byte, version uint64) []byte {
+	return BytesConcat([]byte{NsObjectJournal}, place_pool, place_group[:4], Uint64ToBytes(version))
 }
 
 type Object struct {

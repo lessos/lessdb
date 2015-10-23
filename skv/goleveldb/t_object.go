@@ -161,6 +161,66 @@ func (db *DB) ObjectScan(fold, cursor, end string, limit uint32) *skv.Reply {
 	return rpl
 }
 
+func (db *DB) ObjectJournalScan(pp, pg uint32, start, end uint64, limit uint32) *skv.Reply {
+
+	var (
+		prefix = skv.BytesConcat([]byte{skv.NsObjectJournal}, skv.Uint32ToBytes(pp), skv.Uint32ToBytes(pg))
+		keylen = skv.ObjectFoldLength + skv.ObjectFieldLength
+		cstart = append(prefix, skv.Uint64ToBytes(start)...)
+		cend   = append(prefix, skv.Uint64ToBytes(end)...)
+		rpl    = skv.NewReply("")
+	)
+
+	for i := len(cend); i < 40; i++ {
+		cend = append(cend, 0xff)
+	}
+
+	if limit > uint32(skv.ScanLimitMax) {
+		limit = uint32(skv.ScanLimitMax)
+	}
+
+	keys := [][]byte{}
+
+	iter := db.ldb.NewIterator(&util.Range{Start: cstart, Limit: cend}, nil)
+
+	for iter.Next() {
+
+		if limit < 1 {
+			break
+		}
+
+		if len(iter.Value()) != keylen {
+			continue
+		}
+
+		keys = append(keys, skv.BytesClone(iter.Value()))
+
+		limit--
+	}
+
+	iter.Release()
+
+	if iter.Error() != nil {
+		rpl.Status = iter.Error().Error()
+		return rpl
+	}
+
+	//
+	for _, key := range keys {
+
+		r := db._raw_get(skv.RawNsKeyConcat(skv.NsObjectEntry, append([]byte{skv.ObjectFoldLength}, key...)))
+
+		if r.Status != skv.ReplyOK {
+			continue
+		}
+
+		rpl.Data = append(rpl.Data, key[skv.ObjectFoldLength:])
+		rpl.Data = append(rpl.Data, r.Bytes())
+	}
+
+	return rpl
+}
+
 func (db *DB) ObjectMetaGet(path string) *skv.Reply {
 	return db._raw_get(skv.NewObjectPathParse(path).MetaIndex())
 }
@@ -218,6 +278,8 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 			return skv.ReplyInvalidArgument
 		}
 	}
+
+	prev_version := meta.Version
 
 	//
 	if size >= 0 {
@@ -363,6 +425,15 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 		}
 
 		batch.Put(opath.MetaIndex(), meta.Export())
+
+		if opts.JournalEnable && meta.Version > 0 {
+
+			if prev_version > 0 {
+				batch.Delete(skv.ObjectNsJournalKey(opath.PlacePool(), opath.PlaceGroup(), prev_version))
+			}
+
+			batch.Put(skv.ObjectNsJournalKey(opath.PlacePool(), opath.PlaceGroup(), meta.Version), append(opath.Fold, opath.Field...))
+		}
 
 	} else {
 		batch.Delete(opath.MetaIndex())

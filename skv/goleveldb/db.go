@@ -50,7 +50,7 @@ func Open(cfg skv.Config) (*DB, error) {
 
 	if err == nil {
 		db.ttl_worker()
-		fmt.Println("lessdb/skv.DB opened")
+		fmt.Println("lessdb/skv.DB " + cfg.DataDir + " opened")
 	}
 
 	return db, err

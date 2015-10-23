@@ -30,7 +30,7 @@ func RawTtlEntry(key []byte) []byte {
 }
 
 func RawTtlQueuePrefix(ttl uint64) []byte {
-	return RawNsKeyConcat(NsRawTtlQueue, _uint64_to_bytes(ttl))
+	return RawNsKeyConcat(NsRawTtlQueue, Uint64ToBytes(ttl))
 }
 
 func RawTtlQueue(key []byte, ttl uint64) []byte {

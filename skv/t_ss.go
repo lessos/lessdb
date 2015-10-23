@@ -31,7 +31,7 @@ func SortSetsNsLengthKey(key []byte) []byte {
 }
 
 func SortSetsNsScorePrefix(key []byte, score uint64) []byte {
-	return append(RawNsKeyEncode(nsSsScore, key), _uint64_to_bytes(score)...)
+	return append(RawNsKeyEncode(nsSsScore, key), Uint64ToBytes(score)...)
 }
 
 func SortSetsNsScoreKey(key, member []byte, score uint64) []byte {

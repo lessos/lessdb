@@ -78,6 +78,17 @@ func BytesClone(src []byte) []byte {
 	return dst
 }
 
+func BytesConcat(vs ...[]byte) []byte {
+
+	var bs []byte
+
+	for _, v := range vs {
+		bs = append(bs, v...)
+	}
+
+	return bs
+}
+
 func RandomHexString(length int) string {
 
 	if length < 1 {
@@ -140,10 +151,18 @@ func SintToBytes(sint string, lg uint8) []byte {
 	return uibs[8-lg:]
 }
 
-func _uint64_to_bytes(v uint64) []byte {
+func Uint64ToBytes(v uint64) []byte {
 
 	bs := make([]byte, 8)
 	binary.BigEndian.PutUint64(bs, v)
+
+	return bs
+}
+
+func Uint32ToBytes(v uint32) []byte {
+
+	bs := make([]byte, 4)
+	binary.BigEndian.PutUint32(bs, v)
 
 	return bs
 }

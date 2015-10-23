@@ -31,7 +31,8 @@ const (
 	NsHashEntry          = 0x20
 	NsHashLength         = 0x21
 	NsObjectEntry        = 0x30
-	nsObjectMeta         = 0x31
+	NsObjectMeta         = 0x31
+	NsObjectJournal      = 0x32
 	nsObjectDocSchema    = 0x38
 	nsObjectDocIndex     = 0x39
 	nsObjectDocIncrement = 0x3a

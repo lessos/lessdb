@@ -22,19 +22,19 @@ import (
 )
 
 func ObjectDocFoldKey(fold string) []byte {
-	return _string_to_hash_bytes(_filepath_clean(fold), _obj_fold_len)
+	return _string_to_hash_bytes(_filepath_clean(fold), ObjectFoldLength)
 }
 
 func ObjectDocSchemaKey(key []byte) []byte {
-	return RawNsKeyEncode(nsObjectDocSchema, key)
+	return RawNsKeyConcat(nsObjectDocSchema, key)
 }
 
 func ObjectDocIndexFieldPrefix(key []byte, column uint8) []byte {
-	return append(RawNsKeyEncode(nsObjectDocIndex, key), column)
+	return append(RawNsKeyConcat(nsObjectDocIndex, key), column)
 }
 
 func ObjectDocIndexIncrKey(key []byte, column uint8) []byte {
-	return append(RawNsKeyEncode(nsObjectDocIncrement, key), column)
+	return append(RawNsKeyConcat(nsObjectDocIncrement, key), column)
 }
 
 func ObjectDocBytesIncr(key []byte) []byte {

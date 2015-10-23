@@ -194,7 +194,7 @@ func (db *DB) ObjectDocSchemaSync(fold string, schema skv.ObjectDocSchema) *skv.
 							}
 
 							if bs, ok := skv.ObjectDocIndexValue(&ei, reflect.ValueOf(mv)); ok {
-								batch.Put(append(append(skv.ObjectDocIndexFieldPrefix(key, ei.Seq), bs...), entry.Key...), []byte{})
+								batch.Put(skv.BytesConcat(skv.ObjectDocIndexFieldPrefix(key, ei.Seq), bs, entry.Key), []byte{})
 							}
 
 							break
