@@ -66,7 +66,7 @@ func JsonEncode(js interface{}) ([]byte, error) {
 	return json.Marshal(js)
 }
 
-func _filepath_clean(path string) string {
+func ObjectPathClean(path string) string {
 	return strings.Trim(strings.Trim(filepath.Clean(path), "/"), ".")
 }
 

@@ -81,7 +81,7 @@ func (op *ObjectPath) MetaIndex() []byte {
 }
 
 func (op *ObjectPath) EntryPath() string {
-	return _filepath_clean(op.FoldName + "/" + op.FieldName)
+	return ObjectPathClean(op.FoldName + "/" + op.FieldName)
 }
 
 func (op *ObjectPath) Parent() *ObjectPath {
@@ -106,7 +106,7 @@ func (op *ObjectPath) PlaceGroup() []byte {
 func NewObjectPathKey(fold, key string) *ObjectPath {
 
 	op := &ObjectPath{
-		FoldName: _filepath_clean(fold),
+		FoldName: ObjectPathClean(fold),
 	}
 
 	op.Fold = _string_to_hash_bytes(op.FoldName, ObjectFoldLength)
@@ -128,7 +128,7 @@ func NewObjectPathParse(path string) *ObjectPath {
 
 	op := &ObjectPath{}
 
-	path = _filepath_clean(path)
+	path = ObjectPathClean(path)
 
 	if i := strings.LastIndex(path, "/"); i > 0 {
 		op.FoldName, op.FieldName = path[:i], path[i+1:]
@@ -143,11 +143,11 @@ func NewObjectPathParse(path string) *ObjectPath {
 }
 
 func ObjectNsEntryFoldKey(path string) []byte {
-	return RawNsKeyConcat(NsObjectEntry, _string_to_hash_bytes(_filepath_clean(path), ObjectFoldLength))
+	return RawNsKeyConcat(NsObjectEntry, _string_to_hash_bytes(ObjectPathClean(path), ObjectFoldLength))
 }
 
 func ObjectNsMetaFoldKey(path string) []byte {
-	return RawNsKeyConcat(NsObjectMeta, _string_to_hash_bytes(_filepath_clean(path), ObjectFoldLength))
+	return RawNsKeyConcat(NsObjectMeta, _string_to_hash_bytes(ObjectPathClean(path), ObjectFoldLength))
 }
 
 func ObjectNsJournalKey(place_pool, place_group []byte, version uint64) []byte {
