@@ -270,6 +270,10 @@ func (db *DB) ObjectMetaScan(fold, cursor, end string, limit uint32) *skv.Reply 
 	return rpl
 }
 
+func (db *DB) ObjectJournalVersionIncr(path string, version_group uint32, step int64) *skv.Reply {
+	return db._raw_incrby(skv.NewObjectPathParse(path).NsJournalVersionIndex(version_group), step)
+}
+
 func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.ObjectPath, size int64, opts *skv.ObjectPutOptions) string {
 
 	//
@@ -290,6 +294,7 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 		if meta.Created < 1 {
 			meta.Created = skv.MetaTimeNow()
 		}
+
 		meta.Updated = skv.MetaTimeNow()
 
 		meta.Len = 0
@@ -314,6 +319,10 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 		return skv.ReplyInvalidArgument
 	}
 
+	if opts.JournalEnable && meta.Version == 0 {
+		meta.Version = db._raw_incrby(opath.NsJournalVersionIndex(opts.VersionGroup), 1).Uint64()
+	}
+
 	//
 	if (size >= 0 && fold_meta.Type < 1) || size < 0 {
 
@@ -331,7 +340,7 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 				return skv.ReplyInvalidArgument
 			}
 
-			pfp_meta.Version = opts.Version
+			pfp_meta.Version = meta.Version
 
 			if pfp_meta.Type < 1 {
 				pfp_meta.Name = pfp.FieldName
@@ -353,6 +362,8 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 				pfp_meta.Len++
 
 				pfp_meta.Type = skv.ObjectTypeFold
+
+				// fmt.Println(pfp.FoldName, pfp.FieldName)
 
 				db._raw_put(pfp.EntryIndex(), pfp_meta.Export(), 0)
 				db._raw_put(pfp.MetaIndex(), pfp_meta.Export(), 0)
@@ -426,13 +437,13 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 
 		batch.Put(opath.MetaIndex(), meta.Export())
 
-		if opts.JournalEnable && meta.Version > 0 {
+		if opts.JournalEnable {
 
 			if prev_version > 0 {
-				batch.Delete(skv.ObjectNsJournalKey(opath.PlacePool(), opath.PlaceGroup(), prev_version))
+				batch.Delete(opath.NsJournalEntryIndex(prev_version))
 			}
 
-			batch.Put(skv.ObjectNsJournalKey(opath.PlacePool(), opath.PlaceGroup(), meta.Version), append(opath.Fold, opath.Field...))
+			batch.Put(opath.NsJournalEntryIndex(meta.Version), append(opath.Fold, opath.Field...))
 		}
 
 	} else {
@@ -441,10 +452,15 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 
 	if fold_meta.Len < 1 {
 		batch.Delete(fold_path.MetaIndex())
+		batch.Delete(fold_path.EntryIndex())
 
 		// fmt.Println("\t#### fs dir del", fold_path.EntryPath(), fold_meta.Len)
 	} else {
+
+		fold_meta.Version = meta.Version
+
 		batch.Put(fold_path.MetaIndex(), fold_meta.Export())
+		batch.Put(fold_path.EntryIndex(), fold_meta.Export())
 
 		// fmt.Println("\t#### fs dir add", fold_path.EntryPath(), fold_meta.Len, opath.EntryPath(), meta.Version, skv.MetaTimeNow())
 	}

@@ -30,6 +30,8 @@ const (
 
 	ObjectFoldLength  = 12
 	ObjectFieldLength = 8
+
+	pgsize_max uint64 = 4294967296
 )
 
 type ObjectInterface interface {
@@ -44,6 +46,7 @@ type ObjectInterface interface {
 	ObjectMetaGet(path string) *Reply
 	ObjectMetaScan(fold, cursor, end string, limit uint32) *Reply
 	ObjectJournalScan(place_pool, place_group uint32, start, end uint64, limit uint32) *Reply
+	ObjectJournalVersionIncr(path string, pgsize uint32, step int64) *Reply
 }
 
 type ObjectDocInterface interface {
@@ -59,9 +62,8 @@ type ObjectEventHandler func(opath *ObjectPath, evtype uint8, version uint64)
 type ObjectPutOptions struct {
 	Ttl           uint32
 	Version       uint64
+	VersionGroup  uint32
 	JournalEnable bool
-	// PlacePool     uint32
-	// PlaceGroup    uint32
 }
 
 //
@@ -81,32 +83,44 @@ func (op *ObjectPath) MetaIndex() []byte {
 }
 
 func (op *ObjectPath) EntryPath() string {
-	return _filepath_clean(op.FoldName + "/" + op.FieldName)
+	return ObjectPathClean(op.FoldName + "/" + op.FieldName)
 }
 
 func (op *ObjectPath) Parent() *ObjectPath {
 	return NewObjectPathParse(op.FoldName)
 }
 
-func (op *ObjectPath) PlacePool() []byte {
+func (op *ObjectPath) BucketName() string {
 
 	r := op.FoldName
-	if i := strings.LastIndex(op.FoldName, "/"); i > 0 {
+	if i := strings.Index(op.FoldName, "/"); i > 0 {
 		r = op.FoldName[:i]
 	}
 
-	return _string_to_hash_bytes(r, 4) // 2^32
+	return r
 }
 
-func (op *ObjectPath) PlaceGroup() []byte {
-	return op.Fold[:4] // 2^32
+func (op *ObjectPath) BucketBytes() []byte {
+	return _string_to_hash_bytes(op.BucketName(), 4) // 2^32
+}
+
+func (op *ObjectPath) BucketID() uint32 {
+	return BytesToUint32(op.BucketBytes())
+}
+
+func (op *ObjectPath) NsJournalVersionIndex(version_group uint32) []byte {
+	return BytesConcat([]byte{NsObjectJournalVersion}, op.BucketBytes(), Uint32ToBytes(version_group))
+}
+
+func (op *ObjectPath) NsJournalEntryIndex(version uint64) []byte {
+	return BytesConcat([]byte{NsObjectJournal}, op.BucketBytes(), op.Fold[:4], Uint64ToBytes(version))
 }
 
 //
 func NewObjectPathKey(fold, key string) *ObjectPath {
 
 	op := &ObjectPath{
-		FoldName: _filepath_clean(fold),
+		FoldName: ObjectPathClean(fold),
 	}
 
 	op.Fold = _string_to_hash_bytes(op.FoldName, ObjectFoldLength)
@@ -128,12 +142,21 @@ func NewObjectPathParse(path string) *ObjectPath {
 
 	op := &ObjectPath{}
 
-	path = _filepath_clean(path)
+	is_fold := false
+	if len(path) > 0 && path[len(path)-1] == '/' {
+		is_fold = true
+	}
 
-	if i := strings.LastIndex(path, "/"); i > 0 {
-		op.FoldName, op.FieldName = path[:i], path[i+1:]
+	path = ObjectPathClean(path)
+
+	if is_fold {
+		op.FoldName, op.FieldName = path, ""
 	} else {
-		op.FoldName, op.FieldName = "", path
+		if i := strings.LastIndex(path, "/"); i > 0 {
+			op.FoldName, op.FieldName = path[:i], path[i+1:]
+		} else {
+			op.FoldName, op.FieldName = "", path
+		}
 	}
 
 	op.Fold = _string_to_hash_bytes(op.FoldName, ObjectFoldLength)
@@ -143,15 +166,11 @@ func NewObjectPathParse(path string) *ObjectPath {
 }
 
 func ObjectNsEntryFoldKey(path string) []byte {
-	return RawNsKeyConcat(NsObjectEntry, _string_to_hash_bytes(_filepath_clean(path), ObjectFoldLength))
+	return RawNsKeyConcat(NsObjectEntry, _string_to_hash_bytes(ObjectPathClean(path), ObjectFoldLength))
 }
 
 func ObjectNsMetaFoldKey(path string) []byte {
-	return RawNsKeyConcat(NsObjectMeta, _string_to_hash_bytes(_filepath_clean(path), ObjectFoldLength))
-}
-
-func ObjectNsJournalKey(place_pool, place_group []byte, version uint64) []byte {
-	return BytesConcat([]byte{NsObjectJournal}, place_pool, place_group[:4], Uint64ToBytes(version))
+	return RawNsKeyConcat(NsObjectMeta, _string_to_hash_bytes(ObjectPathClean(path), ObjectFoldLength))
 }
 
 type Object struct {

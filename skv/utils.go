@@ -22,6 +22,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"path/filepath"
 	"strconv"
@@ -66,7 +67,7 @@ func JsonEncode(js interface{}) ([]byte, error) {
 	return json.Marshal(js)
 }
 
-func _filepath_clean(path string) string {
+func ObjectPathClean(path string) string {
 	return strings.Trim(strings.Trim(filepath.Clean(path), "/"), ".")
 }
 
@@ -134,6 +135,29 @@ func BytesToUint64(key []byte) uint64 {
 	return binary.BigEndian.Uint64(uibs)
 }
 
+func BytesToUint32(key []byte) uint32 {
+
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("\tBytesToUint32", r)
+		}
+	}()
+
+	if len(key) < 1 || len(key) > 4 {
+		return 0
+	}
+
+	uibs := make([]byte, 4)
+
+	offset := 4 - len(key)
+
+	for i := 0; i < 4; i++ {
+		uibs[i+offset] = key[i]
+	}
+
+	return binary.BigEndian.Uint32(uibs)
+}
+
 func SintToBytes(sint string, lg uint8) []byte {
 
 	if lg < 1 {
@@ -160,6 +184,12 @@ func Uint64ToBytes(v uint64) []byte {
 }
 
 func Uint32ToBytes(v uint32) []byte {
+
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("\tBytesToUint32", r)
+		}
+	}()
 
 	bs := make([]byte, 4)
 	binary.BigEndian.PutUint32(bs, v)

@@ -201,8 +201,15 @@ func (db *DB) _raw_incrby(key []byte, step int64) *skv.Reply {
 
 	num := uint64(0)
 
-	if rs := db._raw_get(key); rs.Status == skv.ReplyOK {
-		num = rs.Uint64()
+	rpl := db._raw_get(key)
+	if rpl.Status == skv.ReplyOK {
+		num = rpl.Uint64()
+	}
+
+	if step == 0 {
+		rpl.Data = append(rpl.Data, []byte(strconv.FormatUint(num, 10)))
+		rpl.Status = skv.ReplyOK
+		return rpl
 	}
 
 	if step < 0 {
@@ -218,7 +225,7 @@ func (db *DB) _raw_incrby(key []byte, step int64) *skv.Reply {
 	}
 
 	bnum := []byte(strconv.FormatUint(num, 10))
-	rpl := db._raw_put(key, bnum, 0)
+	rpl = db._raw_put(key, bnum, 0)
 	if rpl.Status == skv.ReplyOK {
 		rpl.Data = append(rpl.Data, bnum)
 	}

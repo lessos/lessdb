@@ -25,20 +25,21 @@ const (
 	ScanLimitMax uint32 = 10000
 
 	// Namespace
-	NsRawTtlEntry        = 0x08
-	NsRawTtlQueue        = 0x09
-	NsKvEntry            = 0x10
-	NsHashEntry          = 0x20
-	NsHashLength         = 0x21
-	NsObjectEntry        = 0x30
-	NsObjectMeta         = 0x31
-	NsObjectJournal      = 0x32
-	nsObjectDocSchema    = 0x38
-	nsObjectDocIndex     = 0x39
-	nsObjectDocIncrement = 0x3a
-	nsSsEntry            = 0x40
-	nsSsScore            = 0x41
-	nsSsLength           = 0x42
+	NsRawTtlEntry          = 0x08
+	NsRawTtlQueue          = 0x09
+	NsKvEntry              = 0x10
+	NsHashEntry            = 0x20
+	NsHashLength           = 0x21
+	NsObjectEntry          = 0x30
+	NsObjectMeta           = 0x31
+	NsObjectJournal        = 0x32
+	NsObjectJournalVersion = 0x33
+	nsObjectDocSchema      = 0x38
+	nsObjectDocIndex       = 0x39
+	nsObjectDocIncrement   = 0x3a
+	nsSsEntry              = 0x40
+	nsSsScore              = 0x41
+	nsSsLength             = 0x42
 )
 
 type DB interface {
