@@ -319,8 +319,10 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 		return skv.ReplyInvalidArgument
 	}
 
+	// fmt.Printf("opts.JournalEnable PUT %s/%s, EN:%v, TTL:%d, VER:%d\n", opath.FoldName, opath.FieldName, opts.JournalEnable, opts.Ttl, meta.Version)
 	if opts.JournalEnable && meta.Version == 0 {
 		meta.Version = db._raw_incrby(opath.NsJournalVersionIndex(opts.VersionGroup), 1).Uint64()
+		// fmt.Println("opts.JournalEnable Version NEW", meta.Version)
 	}
 
 	//

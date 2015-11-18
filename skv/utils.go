@@ -49,6 +49,20 @@ func MetaTimeNow() uint64 {
 	return 0
 }
 
+func MetaTimeFormat(t uint64, fm string) string {
+
+	tp, err := time.ParseInLocation("20060102150405", strconv.FormatUint(t/1000, 10), time.UTC)
+	if err != nil {
+		tp = time.Now()
+	}
+
+	if fm == "rfc3339" {
+		fm = time.RFC3339
+	}
+
+	return tp.Local().Format(fm)
+}
+
 func JsonDecode(src []byte, js interface{}) (err error) {
 
 	defer func() {
