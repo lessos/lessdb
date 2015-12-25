@@ -31,7 +31,8 @@ import (
 )
 
 const (
-	MetaTimeStd = "20060102150405.000"
+	MetaTimeStd       = "20060102150405.000"
+	meta_time_std_sec = "20060102150405"
 )
 
 func TimeNowMS() uint64 {
@@ -51,16 +52,21 @@ func MetaTimeNow() uint64 {
 
 func MetaTimeFormat(t uint64, fm string) string {
 
-	tp, err := time.ParseInLocation("20060102150405", strconv.FormatUint(t/1000, 10), time.UTC)
-	if err != nil {
-		tp = time.Now()
-	}
-
 	if fm == "rfc3339" {
 		fm = time.RFC3339
 	}
 
-	return tp.Local().Format(fm)
+	return MetaTimeParse(t).Local().Format(fm)
+}
+
+func MetaTimeParse(t uint64) time.Time {
+
+	tp, err := time.ParseInLocation(meta_time_std_sec, strconv.FormatUint(t/1000, 10), time.UTC)
+	if err != nil {
+		tp = time.Now()
+	}
+
+	return tp
 }
 
 func JsonDecode(src []byte, js interface{}) (err error) {
