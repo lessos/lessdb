@@ -24,9 +24,10 @@ import (
 )
 
 var (
-	_obj_meta_locker   sync.Mutex
-	_obj_event_handler skv.ObjectEventHandler
-	_obj_options_def   = &skv.ObjectPutOptions{}
+	_obj_meta_locker      sync.Mutex
+	_obj_grpstatus_locker sync.Mutex
+	_obj_event_handler    skv.ObjectEventHandler
+	_obj_options_def      = &skv.ObjectPutOptions{}
 )
 
 func (db *DB) ObjectEventRegister(ev skv.ObjectEventHandler) {
@@ -161,25 +162,31 @@ func (db *DB) ObjectScan(fold, cursor, end string, limit uint32) *skv.Reply {
 	return rpl
 }
 
-func (db *DB) ObjectJournalScan(pp, pg uint32, start, end uint64, limit uint32) *skv.Reply {
+type _object_journal struct {
+	path    []byte
+	version uint64
+}
+
+func (db *DB) ObjectJournalScan(bucket string, pnum uint32, start, end uint64, limit uint32) *skv.Reply {
 
 	var (
-		prefix = skv.BytesConcat([]byte{skv.NsObjectJournal}, skv.Uint32ToBytes(pp), skv.Uint32ToBytes(pg))
-		keylen = skv.ObjectFoldLength + skv.ObjectFieldLength
+		prefix = skv.BytesConcat([]byte{skv.NsObjectJournal}, skv.NewObjectPathParse(bucket+"/0").BucketBytes(), skv.Uint32ToBytes(pnum))
 		cstart = append(prefix, skv.Uint64ToBytes(start)...)
-		cend   = append(prefix, skv.Uint64ToBytes(end)...)
+		cend   = prefix
 		rpl    = skv.NewReply("")
 	)
 
-	for i := len(cend); i < 40; i++ {
-		cend = append(cend, 0xff)
+	if end <= start {
+		cend = append(prefix, []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}...)
+	} else {
+		cend = append(prefix, skv.Uint64ToBytes(end)...)
 	}
 
 	if limit > uint32(skv.ScanLimitMax) {
 		limit = uint32(skv.ScanLimitMax)
 	}
 
-	keys := [][]byte{}
+	keys := []_object_journal{}
 
 	iter := db.ldb.NewIterator(&util.Range{Start: cstart, Limit: cend}, nil)
 
@@ -189,11 +196,14 @@ func (db *DB) ObjectJournalScan(pp, pg uint32, start, end uint64, limit uint32) 
 			break
 		}
 
-		if len(iter.Value()) != keylen {
+		if len(iter.Value()) < 1 {
 			continue
 		}
 
-		keys = append(keys, skv.BytesClone(iter.Value()))
+		keys = append(keys, _object_journal{
+			path:    skv.BytesClone(iter.Value()),
+			version: skv.BytesToUint64(iter.Key()[len(iter.Key())-8:]),
+		})
 
 		limit--
 	}
@@ -208,14 +218,22 @@ func (db *DB) ObjectJournalScan(pp, pg uint32, start, end uint64, limit uint32) 
 	//
 	for _, key := range keys {
 
-		r := db._raw_get(skv.RawNsKeyConcat(skv.NsObjectEntry, append([]byte{skv.ObjectFoldLength}, key...)))
+		r := db._raw_get(skv.NewObjectPathParse(string(key.path)).EntryIndex())
 
-		if r.Status != skv.ReplyOK {
-			continue
+		if r.Status == skv.ReplyNotFound {
+
+			nil_meta := &skv.ObjectMeta{}
+
+			rpl.Data = append(rpl.Data, key.path)
+			rpl.Data = append(rpl.Data, nil_meta.Export())
+
+		} else if r.Status == skv.ReplyOK {
+
+			if key.version == r.ObjectMeta().Version {
+				rpl.Data = append(rpl.Data, key.path)
+				rpl.Data = append(rpl.Data, r.Bytes())
+			}
 		}
-
-		rpl.Data = append(rpl.Data, key[skv.ObjectFoldLength:])
-		rpl.Data = append(rpl.Data, r.Bytes())
 	}
 
 	return rpl
@@ -270,8 +288,54 @@ func (db *DB) ObjectMetaScan(fold, cursor, end string, limit uint32) *skv.Reply 
 	return rpl
 }
 
-func (db *DB) ObjectJournalVersionIncr(path string, version_group uint32, step int64) *skv.Reply {
-	return db._raw_incrby(skv.NewObjectPathParse(path).NsJournalVersionIndex(version_group), step)
+func (db *DB) ObjectJournalVersionIncr(path string, group_number uint32, step int64) *skv.Reply {
+	return db._raw_incrby(skv.NewObjectPathParse(path).NsJournalVersionIndex(group_number), step)
+}
+
+func (db *DB) ObjectGroupStatus(bucket string, group_number uint32) *skv.Reply {
+	return db._raw_get(skv.NewObjectPathParse(bucket + "/0").NsGroupStatusIndex(group_number))
+}
+
+func (db *DB) _obj_group_status_sync(bucket_bytes []byte, group_number uint32, evtype uint8, size int64) {
+
+	if evtype == skv.ObjectEventNone {
+		return
+	}
+
+	if evtype == skv.ObjectEventUpdated && size == 0 {
+		return
+	}
+
+	_obj_grpstatus_locker.Lock()
+	defer _obj_grpstatus_locker.Unlock()
+
+	var (
+		key = skv.BytesConcat([]byte{skv.NsObjectGroupStatus}, bucket_bytes, skv.Uint32ToBytes(group_number))
+		st  skv.ObjectGroupStatus
+	)
+
+	// TOPO
+	if rs := db._raw_get(key); rs.Status == skv.ReplyOK {
+		rs.JsonDecode(&st)
+	} else if rs.Status != skv.ReplyNotFound {
+		return
+	}
+
+	resize := int64(st.Size) + size
+
+	if resize > 0 {
+		st.Size = uint64(resize)
+	} else {
+		st.Size = 0
+	}
+
+	if evtype == skv.ObjectEventCreated {
+		st.Len++
+	} else if evtype == skv.ObjectEventDeleted && st.Len > 0 {
+		st.Len--
+	}
+
+	db._raw_put_json(key, st, 0)
 }
 
 func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.ObjectPath, size int64, opts *skv.ObjectPutOptions) string {
@@ -306,9 +370,11 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 	defer _obj_meta_locker.Unlock()
 
 	var (
-		fold_size int64
-		fold_path = opath.Parent()
-		fold_meta = db._raw_get(fold_path.MetaIndex()).ObjectMeta()
+		fold_size     int64 = 0
+		fold_path           = opath.Parent()
+		fold_meta           = db._raw_get(fold_path.MetaIndex()).ObjectMeta()
+		gstatus_event       = skv.ObjectEventNone
+		gstatus_size  int64 = 0
 	)
 
 	if fold_meta.Type > 0 && fold_meta.Type != skv.ObjectTypeFold {
@@ -321,8 +387,16 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 
 	// fmt.Printf("opts.JournalEnable PUT %s/%s, EN:%v, TTL:%d, VER:%d\n", opath.FoldName, opath.FieldName, opts.JournalEnable, opts.Ttl, meta.Version)
 	if opts.JournalEnable && meta.Version == 0 {
-		meta.Version = db._raw_incrby(opath.NsJournalVersionIndex(opts.VersionGroup), 1).Uint64()
+		meta.Version = db._raw_incrby(opath.NsJournalVersionIndex(opts.GroupNumber), 1).Uint64()
 		// fmt.Println("opts.JournalEnable Version NEW", meta.Version)
+	}
+
+	if size == -1 {
+		gstatus_event = skv.ObjectEventDeleted
+	} else if fold_meta.Type > 0 {
+		gstatus_event = skv.ObjectEventUpdated
+	} else {
+		gstatus_event = skv.ObjectEventCreated
 	}
 
 	//
@@ -410,9 +484,14 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 	meta.Type = otype
 
 	if size >= 0 {
+		gstatus_size = size - int64(meta.Size)
+
 		fold_size = int64(fold_meta.Size) + (size - int64(meta.Size))
 		meta.Size = uint64(size)
+
 	} else {
+		gstatus_size = 0 - int64(meta.Size)
+
 		fold_size = int64(fold_meta.Size) - int64(meta.Size)
 	}
 
@@ -442,14 +521,19 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 		if opts.JournalEnable {
 
 			if prev_version > 0 {
-				batch.Delete(opath.NsJournalEntryIndex(prev_version))
+				batch.Delete(opath.NsJournalEntryIndex(opts.GroupNumber, prev_version))
 			}
 
-			batch.Put(opath.NsJournalEntryIndex(meta.Version), append(opath.Fold, opath.Field...))
+			// batch.Put(opath.NsJournalEntryIndex(opts.GroupNumber, meta.Version), append(opath.Fold, opath.Field...))
+			batch.Put(opath.NsJournalEntryIndex(opts.GroupNumber, meta.Version), []byte(opath.EntryPath()))
 		}
 
 	} else {
 		batch.Delete(opath.MetaIndex())
+	}
+
+	if opts.GroupStatusEnable {
+		db._obj_group_status_sync(opath.BucketBytes(), opts.GroupNumber, gstatus_event, gstatus_size)
 	}
 
 	if fold_meta.Len < 1 {

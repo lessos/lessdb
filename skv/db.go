@@ -34,6 +34,7 @@ const (
 	NsObjectMeta           = 0x31
 	NsObjectJournal        = 0x32
 	NsObjectJournalVersion = 0x33
+	NsObjectGroupStatus    = 0x34
 	nsObjectDocSchema      = 0x38
 	nsObjectDocIndex       = 0x39
 	nsObjectDocIncrement   = 0x3a

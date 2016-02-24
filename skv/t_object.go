@@ -24,6 +24,7 @@ const (
 	ObjectTypeGeneral  = 0x0a
 	ObjectTypeDocument = 0x0b
 
+	ObjectEventNone    uint8 = 0
 	ObjectEventCreated uint8 = 1
 	ObjectEventUpdated uint8 = 2
 	ObjectEventDeleted uint8 = 3
@@ -45,8 +46,9 @@ type ObjectInterface interface {
 	//
 	ObjectMetaGet(path string) *Reply
 	ObjectMetaScan(fold, cursor, end string, limit uint32) *Reply
-	ObjectJournalScan(place_pool, place_group uint32, start, end uint64, limit uint32) *Reply
+	ObjectJournalScan(bucket string, place_group uint32, start, end uint64, limit uint32) *Reply
 	ObjectJournalVersionIncr(path string, pgsize uint32, step int64) *Reply
+	ObjectGroupStatus(bucket string, place_group uint32) *Reply
 }
 
 type ObjectDocInterface interface {
@@ -60,10 +62,11 @@ type ObjectDocInterface interface {
 type ObjectEventHandler func(opath *ObjectPath, evtype uint8, version uint64)
 
 type ObjectPutOptions struct {
-	Ttl           uint32
-	Version       uint64
-	VersionGroup  uint32
-	JournalEnable bool
+	Ttl               uint32
+	Version           uint64
+	JournalEnable     bool
+	GroupNumber       uint32
+	GroupStatusEnable bool
 }
 
 //
@@ -72,6 +75,11 @@ type ObjectPath struct {
 	FoldName  string
 	Field     []byte
 	FieldName string
+}
+
+type ObjectGroupStatus struct {
+	Size uint64 `json:"size"`
+	Len  uint64 `json:"len"`
 }
 
 func (op *ObjectPath) EntryIndex() []byte {
@@ -108,12 +116,16 @@ func (op *ObjectPath) BucketID() uint32 {
 	return BytesToUint32(op.BucketBytes())
 }
 
-func (op *ObjectPath) NsJournalVersionIndex(version_group uint32) []byte {
-	return BytesConcat([]byte{NsObjectJournalVersion}, op.BucketBytes(), Uint32ToBytes(version_group))
+func (op *ObjectPath) NsJournalVersionIndex(group_number uint32) []byte {
+	return BytesConcat([]byte{NsObjectJournalVersion}, op.BucketBytes(), Uint32ToBytes(group_number))
 }
 
-func (op *ObjectPath) NsJournalEntryIndex(version uint64) []byte {
-	return BytesConcat([]byte{NsObjectJournal}, op.BucketBytes(), op.Fold[:4], Uint64ToBytes(version))
+func (op *ObjectPath) NsJournalEntryIndex(group_number uint32, version uint64) []byte {
+	return BytesConcat([]byte{NsObjectJournal}, op.BucketBytes(), Uint32ToBytes(group_number), Uint64ToBytes(version))
+}
+
+func (op *ObjectPath) NsGroupStatusIndex(group_number uint32) []byte {
+	return BytesConcat([]byte{NsObjectGroupStatus}, op.BucketBytes(), Uint32ToBytes(group_number))
 }
 
 //
@@ -202,6 +214,7 @@ type Object struct {
 // common
 //  - name_len 1 52:53
 //  - name     n
+//
 type ObjectMeta struct {
 	seek_len int
 	Type     uint8  `json:"type"`
@@ -216,6 +229,7 @@ type ObjectMeta struct {
 	Len      uint32 `json:"len,omitempty"`
 	SumCheck uint32 `json:"sumcheck,omitempty"`
 	Name     string `json:"name"`
+	// Path     string `json:"path,omitempty"`
 }
 
 func (m *ObjectMeta) Export() []byte {
@@ -258,6 +272,10 @@ func (m *ObjectMeta) Export() []byte {
 	binary.BigEndian.PutUint16(data[1:3], uint16(len(data)))
 
 	return data
+}
+
+func (m *ObjectMeta) SeekLength() int {
+	return m.seek_len
 }
 
 func ObjectMetaParse(data []byte) ObjectMeta {
