@@ -27,7 +27,7 @@ var (
 	_obj_meta_locker      sync.Mutex
 	_obj_grpstatus_locker sync.Mutex
 	_obj_event_handler    skv.ObjectEventHandler
-	_obj_options_def      = &skv.ObjectPutOptions{}
+	_obj_options_def      = &skv.ObjectWriteOptions{}
 )
 
 func (db *DB) ObjectEventRegister(ev skv.ObjectEventHandler) {
@@ -42,7 +42,7 @@ func (db *DB) ObjectGet(path string) *skv.Reply {
 	return db._raw_get(skv.NewObjectPathParse(path).EntryIndex())
 }
 
-func (db *DB) ObjectPut(path string, value interface{}, opts *skv.ObjectPutOptions) *skv.Reply {
+func (db *DB) ObjectPut(path string, value interface{}, opts *skv.ObjectWriteOptions) *skv.Reply {
 
 	var (
 		opath  = skv.NewObjectPathParse(path)
@@ -338,7 +338,7 @@ func (db *DB) _obj_group_status_sync(bucket_bytes []byte, group_number uint32, e
 	db._raw_put_json(key, st, 0)
 }
 
-func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.ObjectPath, size int64, opts *skv.ObjectPutOptions) string {
+func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.ObjectPath, size int64, opts *skv.ObjectWriteOptions) string {
 
 	//
 	if meta.Type > 0 {

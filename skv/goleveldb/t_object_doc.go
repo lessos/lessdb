@@ -227,7 +227,7 @@ func (db *DB) ObjectDocGet(fold, key string) *skv.Reply {
 	return db._raw_get(skv.NewObjectPathKey(fold, key).EntryIndex())
 }
 
-func (db *DB) ObjectDocPut(fold, key string, obj interface{}, opts *skv.ObjectPutOptions) *skv.Reply {
+func (db *DB) ObjectDocPut(fold, key string, obj interface{}, opts *skv.ObjectWriteOptions) *skv.Reply {
 
 	_obj_doc_global_locker.Lock()
 	_obj_doc_global_locker.Unlock()
