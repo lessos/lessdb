@@ -330,9 +330,9 @@ func (db *DB) _obj_group_status_sync(bucket_bytes []byte, group_number uint32, e
 	}
 
 	if evtype == skv.ObjectEventCreated {
-		st.Len++
-	} else if evtype == skv.ObjectEventDeleted && st.Len > 0 {
-		st.Len--
+		st.Num++
+	} else if evtype == skv.ObjectEventDeleted && st.Num > 0 {
+		st.Num--
 	}
 
 	db._raw_put_json(key, st, 0)
@@ -361,7 +361,7 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 
 		meta.Updated = skv.MetaTimeNow()
 
-		meta.Len = 0
+		meta.Num = 0
 
 		meta.Name = opath.FieldName
 	}
@@ -435,7 +435,7 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 
 			if size >= 0 {
 
-				pfp_meta.Len++
+				pfp_meta.Num++
 
 				pfp_meta.Type = skv.ObjectTypeFold
 
@@ -450,9 +450,9 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 
 			} else if found {
 
-				if pfp_meta.Len > 1 {
+				if pfp_meta.Num > 1 {
 
-					pfp_meta.Len--
+					pfp_meta.Num--
 
 					db._raw_put(pfp.EntryIndex(), pfp_meta.Export(), 0)
 					db._raw_put(pfp.MetaIndex(), pfp_meta.Export(), 0)
@@ -477,9 +477,9 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 
 	//
 	if size >= 0 && meta.Type < 1 {
-		fold_meta.Len++
-	} else if size < 0 && fold_meta.Len > 0 {
-		fold_meta.Len--
+		fold_meta.Num++
+	} else if size < 0 && fold_meta.Num > 0 {
+		fold_meta.Num--
 	}
 	meta.Type = otype
 
@@ -536,11 +536,11 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 		db._obj_group_status_sync(opath.BucketBytes(), opts.GroupNumber, gstatus_event, gstatus_size)
 	}
 
-	if fold_meta.Len < 1 {
+	if fold_meta.Num < 1 {
 		batch.Delete(fold_path.MetaIndex())
 		batch.Delete(fold_path.EntryIndex())
 
-		// fmt.Println("\t#### fs dir del", fold_path.EntryPath(), fold_meta.Len)
+		// fmt.Println("\t#### fs dir del", fold_path.EntryPath(), fold_meta.Num)
 	} else {
 
 		fold_meta.Version = meta.Version
@@ -548,7 +548,7 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 		batch.Put(fold_path.MetaIndex(), fold_meta.Export())
 		batch.Put(fold_path.EntryIndex(), fold_meta.Export())
 
-		// fmt.Println("\t#### fs dir add", fold_path.EntryPath(), fold_meta.Len, opath.EntryPath(), meta.Version, skv.MetaTimeNow())
+		// fmt.Println("\t#### fs dir add", fold_path.EntryPath(), fold_meta.Num, opath.EntryPath(), meta.Version, skv.MetaTimeNow())
 	}
 
 	//

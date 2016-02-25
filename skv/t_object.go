@@ -79,7 +79,7 @@ type ObjectPath struct {
 
 type ObjectGroupStatus struct {
 	Size uint64 `json:"size"`
-	Len  uint64 `json:"len"`
+	Num  uint64 `json:"num"`
 }
 
 func (op *ObjectPath) EntryIndex() []byte {
@@ -207,7 +207,7 @@ type Object struct {
 //  - ttl      4 44:48
 //
 // fold
-//  - len      4 48:52
+//  - num      4 48:52
 // entry
 //	- sumcheck 4 48:52
 //
@@ -226,10 +226,9 @@ type ObjectMeta struct {
 	User     uint32 `json:"user,omitempty"`
 	Mode     uint8  `json:"mode,omitempty"`
 	Ttl      uint32 `json:"ttl,omitempty"`
-	Len      uint32 `json:"len,omitempty"`
+	Num      uint32 `json:"num,omitempty"`
 	SumCheck uint32 `json:"sumcheck,omitempty"`
 	Name     string `json:"name"`
-	// Path     string `json:"path,omitempty"`
 }
 
 func (m *ObjectMeta) Export() []byte {
@@ -253,7 +252,7 @@ func (m *ObjectMeta) Export() []byte {
 
 	//
 	if m.Type == ObjectTypeFold {
-		binary.BigEndian.PutUint32(data[48:52], m.Len)
+		binary.BigEndian.PutUint32(data[48:52], m.Num)
 	} else if m.Type == ObjectTypeGeneral {
 		binary.BigEndian.PutUint32(data[48:52], m.SumCheck)
 	}
@@ -302,7 +301,7 @@ func ObjectMetaParse(data []byte) ObjectMeta {
 
 		//
 		if m.Type == ObjectTypeFold {
-			m.Len = binary.BigEndian.Uint32(data[48:52])
+			m.Num = binary.BigEndian.Uint32(data[48:52])
 		} else if m.Type == ObjectTypeGeneral {
 			m.SumCheck = binary.BigEndian.Uint32(data[48:52])
 		}
