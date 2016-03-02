@@ -16,8 +16,8 @@ package skv
 
 type HashInterface interface {
 	HashGet(key, field []byte) *Reply
-	HashPut(key, field, value []byte, ttl uint32) *Reply
-	HashPutJson(key, field []byte, value interface{}, ttl uint32) *Reply
+	HashPut(key, field, value []byte, ttl int64) *Reply
+	HashPutJson(key, field []byte, value interface{}, ttl int64) *Reply
 	HashDel(key, field []byte) *Reply
 	HashScan(key, cursor, end []byte, limit uint32) *Reply
 	HashLen(key []byte) *Reply

@@ -15,15 +15,10 @@
 package skv
 
 import (
-	"encoding/binary"
 	"strings"
 )
 
 const (
-	ObjectTypeFold     = 0x01
-	ObjectTypeGeneral  = 0x0a
-	ObjectTypeDocument = 0x0b
-
 	ObjectEventNone    uint8 = 0
 	ObjectEventCreated uint8 = 1
 	ObjectEventUpdated uint8 = 2
@@ -31,8 +26,6 @@ const (
 
 	ObjectFoldLength  = 12
 	ObjectFieldLength = 8
-
-	pgsize_max uint64 = 4294967296
 )
 
 type ObjectInterface interface {
@@ -62,7 +55,7 @@ type ObjectDocInterface interface {
 type ObjectEventHandler func(opath *ObjectPath, evtype uint8, version uint64)
 
 type ObjectWriteOptions struct {
-	Ttl               uint32
+	Ttl               int64
 	Version           uint64
 	JournalEnable     bool
 	GroupNumber       uint32
@@ -190,128 +183,4 @@ type Object struct {
 	Status string
 	Meta   ObjectMeta
 	Key    []byte
-}
-
-// common
-//  - mtype    1 0:1
-//  - seek_len 2 1:3
-//
-//  - version  8 3:11
-//  - size     8 11:19
-//  - created  8 19:27
-//  - updated  8 27:35
-//
-//  - group    4 35:39
-//  - user     4 39:43
-//  - mode     1 43:44
-//  - ttl      4 44:48
-//
-// fold
-//  - num      4 48:52
-// entry
-//	- sumcheck 4 48:52
-//
-// common
-//  - name_len 1 52:53
-//  - name     n
-//
-type ObjectMeta struct {
-	seek_len int
-	Type     uint8  `json:"type"`
-	Version  uint64 `json:"version,omitempty"`
-	Size     uint64 `json:"size"`
-	Created  uint64 `json:"created"`
-	Updated  uint64 `json:"updated"`
-	Group    uint32 `json:"group,omitempty"`
-	User     uint32 `json:"user,omitempty"`
-	Mode     uint8  `json:"mode,omitempty"`
-	Ttl      uint32 `json:"ttl,omitempty"`
-	Num      uint32 `json:"num,omitempty"`
-	SumCheck uint32 `json:"sumcheck,omitempty"`
-	Name     string `json:"name"`
-}
-
-func (m *ObjectMeta) Export() []byte {
-
-	data := make([]byte, 53)
-
-	//
-	data[0] = m.Type
-
-	//
-	binary.BigEndian.PutUint64(data[3:11], m.Version)
-	binary.BigEndian.PutUint64(data[11:19], m.Size)
-	binary.BigEndian.PutUint64(data[19:27], m.Created)
-	binary.BigEndian.PutUint64(data[27:35], m.Updated)
-
-	//
-
-	binary.BigEndian.PutUint32(data[35:39], m.Group)
-	binary.BigEndian.PutUint32(data[39:43], m.User)
-	binary.BigEndian.PutUint32(data[44:48], m.Ttl)
-
-	//
-	if m.Type == ObjectTypeFold {
-		binary.BigEndian.PutUint32(data[48:52], m.Num)
-	} else if m.Type == ObjectTypeGeneral {
-		binary.BigEndian.PutUint32(data[48:52], m.SumCheck)
-	}
-
-	//
-	namelen := len(m.Name)
-	if namelen > 200 {
-		namelen = 200
-	}
-
-	if namelen > 0 {
-		data[52] = uint8(namelen)
-		data = append(data, []byte(m.Name[:namelen])...)
-	}
-
-	binary.BigEndian.PutUint16(data[1:3], uint16(len(data)))
-
-	return data
-}
-
-func (m *ObjectMeta) SeekLength() int {
-	return m.seek_len
-}
-
-func ObjectMetaParse(data []byte) ObjectMeta {
-
-	m := ObjectMeta{}
-
-	if len(data) > 53 {
-
-		//
-		m.Type = data[0]
-		m.seek_len = int(binary.BigEndian.Uint16(data[1:3]))
-
-		//
-		m.Version = binary.BigEndian.Uint64(data[3:11])
-		m.Size = binary.BigEndian.Uint64(data[11:19])
-		m.Created = binary.BigEndian.Uint64(data[19:27])
-		m.Updated = binary.BigEndian.Uint64(data[27:35])
-
-		//
-		m.Group = binary.BigEndian.Uint32(data[35:39])
-		m.User = binary.BigEndian.Uint32(data[39:43])
-		m.Mode = data[43]
-		m.Ttl = binary.BigEndian.Uint32(data[44:48])
-
-		//
-		if m.Type == ObjectTypeFold {
-			m.Num = binary.BigEndian.Uint32(data[48:52])
-		} else if m.Type == ObjectTypeGeneral {
-			m.SumCheck = binary.BigEndian.Uint32(data[48:52])
-		}
-
-		//
-		if len(data) >= m.seek_len {
-			// m.NameLen = data[52]
-			m.Name = string(data[53:m.seek_len])
-		}
-	}
-
-	return m
 }

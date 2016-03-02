@@ -44,7 +44,7 @@ func (db *DB) ObjectDocSchemaSync(fold string, schema skv.ObjectDocSchema) *skv.
 	)
 
 	if len(schema.Indexes) > skv.ObjectDocSchemaMaxIndex {
-		rpl.Status = skv.ReplyInvalidArgument
+		rpl.Status = skv.ReplyBadArgument
 		return rpl
 	}
 
@@ -240,7 +240,7 @@ func (db *DB) ObjectDocPut(fold, key string, obj interface{}, opts *skv.ObjectWr
 	if len(opath.Fold) > skv.ObjectDocKeyLenMax ||
 		len(opath.Field) > skv.ObjectDocPriLenMax ||
 		obj == nil {
-		rpl.Status = skv.ReplyInvalidArgument
+		rpl.Status = skv.ReplyBadArgument
 		return rpl
 	}
 
@@ -284,7 +284,7 @@ func (db *DB) ObjectDocPut(fold, key string, obj interface{}, opts *skv.ObjectWr
 
 	} else {
 
-		rpl.Status = skv.ReplyInvalidArgument
+		rpl.Status = skv.ReplyBadArgument
 		return rpl
 	}
 
@@ -349,7 +349,7 @@ func (db *DB) ObjectDocPut(fold, key string, obj interface{}, opts *skv.ObjectWr
 			objIdxKeyPrefix := append(skv.ObjectDocIndexFieldPrefix(opath.Fold, siKey), siEntry.Data...)
 
 			if rs := db._raw_scan(objIdxKeyPrefix, []byte{}, 1).Hash(); len(rs) > 0 {
-				rpl.Status = skv.ReplyInvalidArgument
+				rpl.Status = skv.ReplyBadArgument
 				return rpl
 			}
 		}
@@ -438,7 +438,7 @@ func (db *DB) ObjectDocDel(fold, key string) *skv.Reply {
 func (db *DB) ObjectDocQuery(fold string, qry *skv.ObjectDocQuerySet) *skv.Reply {
 
 	var (
-		rpl  = skv.NewReply(skv.ReplyInvalidArgument)
+		rpl  = skv.NewReply(skv.ReplyBadArgument)
 		key  = skv.ObjectDocFoldKey(fold)
 		skey = string(key)
 	)

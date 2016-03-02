@@ -77,7 +77,7 @@ func (db *DB) ObjectPut(path string, value interface{}, opts *skv.ObjectWriteOpt
 		}
 
 	default:
-		return skv.NewReply(skv.ReplyInvalidArgument)
+		return skv.NewReply(skv.ReplyBadArgument)
 	}
 
 	meta := db._raw_get(mkey).ObjectMeta()
@@ -343,7 +343,7 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 	//
 	if meta.Type > 0 {
 		if meta.Type != otype || meta.Name != opath.FieldName {
-			return skv.ReplyInvalidArgument
+			return skv.ReplyBadArgument
 		}
 	}
 
@@ -378,11 +378,11 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 	)
 
 	if fold_meta.Type > 0 && fold_meta.Type != skv.ObjectTypeFold {
-		return skv.ReplyInvalidArgument
+		return skv.ReplyBadArgument
 	}
 
 	if fold_meta.Type > 0 && fold_meta.Name != fold_path.FieldName {
-		return skv.ReplyInvalidArgument
+		return skv.ReplyBadArgument
 	}
 
 	// fmt.Printf("opts.JournalEnable PUT %s/%s, EN:%v, TTL:%d, VER:%d\n", opath.FoldName, opath.FieldName, opts.JournalEnable, opts.Ttl, meta.Version)
@@ -413,7 +413,7 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 			//
 			pfp_meta := db._raw_get(pfp.MetaIndex()).ObjectMeta()
 			if pfp_meta.Type > 0 && pfp_meta.Type != skv.ObjectTypeFold {
-				return skv.ReplyInvalidArgument
+				return skv.ReplyBadArgument
 			}
 
 			pfp_meta.Version = meta.Version
@@ -516,6 +516,7 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 			return "ServerError TTL Set"
 		}
 
+		meta.Ttl = opts.Ttl
 		batch.Put(opath.MetaIndex(), meta.Export())
 
 		if opts.JournalEnable {

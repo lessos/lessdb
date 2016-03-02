@@ -29,10 +29,10 @@ func RawTtlEntry(key []byte) []byte {
 	return RawNsKeyConcat(NsRawTtlEntry, key)
 }
 
-func RawTtlQueuePrefix(ttl uint64) []byte {
-	return RawNsKeyConcat(NsRawTtlQueue, Uint64ToBytes(ttl))
+func RawTtlQueuePrefix(ttlat uint64) []byte {
+	return RawNsKeyConcat(NsRawTtlQueue, Uint64ToBytes(ttlat))
 }
 
-func RawTtlQueue(key []byte, ttl uint64) []byte {
-	return append(RawTtlQueuePrefix(ttl), key...)
+func RawTtlQueue(key []byte, ttlat uint64) []byte {
+	return append(RawTtlQueuePrefix(ttlat), key...)
 }

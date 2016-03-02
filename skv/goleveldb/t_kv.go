@@ -22,11 +22,11 @@ func (db *DB) KvGet(key []byte) *skv.Reply {
 	return db._raw_get(skv.RawNsKeyConcat(skv.NsKvEntry, key))
 }
 
-func (db *DB) KvPut(key, value []byte, ttl uint32) *skv.Reply {
+func (db *DB) KvPut(key, value []byte, ttl int64) *skv.Reply {
 	return db._raw_put(skv.RawNsKeyConcat(skv.NsKvEntry, key), value, ttl)
 }
 
-func (db *DB) KvPutJson(key []byte, value interface{}, ttl uint32) *skv.Reply {
+func (db *DB) KvPutJson(key []byte, value interface{}, ttl int64) *skv.Reply {
 	return db._raw_put_json(skv.RawNsKeyConcat(skv.NsKvEntry, key), value, ttl)
 }
 

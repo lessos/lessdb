@@ -50,6 +50,17 @@ func MetaTimeNow() uint64 {
 	return 0
 }
 
+func MetaTimeNowAddMS(add int64) uint64 {
+
+	t := time.Now().UTC().Add(time.Duration(add * 1e6)).Format(MetaTimeStd)
+
+	if u64, err := strconv.ParseUint(t[:14]+t[15:], 10, 64); err == nil {
+		return u64
+	}
+
+	return 0
+}
+
 func MetaTimeFormat(t uint64, fm string) string {
 
 	if fm == "rfc3339" {

@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	_ttl_worker_sleep        = 200e6
+	_ttl_worker_sleep        = 500e6
 	_ttl_worker_limit uint64 = 10000
 )
 
@@ -32,13 +32,13 @@ func (db *DB) ttl_worker() {
 
 		for {
 
-			ls := db._raw_ssttl_range(0, skv.TimeNowMS(), _ttl_worker_limit).Hash()
+			ls := db._raw_ssttlat_range(0, skv.MetaTimeNow(), _ttl_worker_limit).Hash()
 
 			for _, v := range ls {
 
 				batch := new(leveldb.Batch)
 
-				if db._raw_get(skv.RawTtlEntry(v.Key[9:])).Uint64() == v.Uint64() {
+				if skv.BytesToUint64(db._raw_get(skv.RawTtlEntry(v.Key[9:])).Bytes()) == v.Uint64() {
 
 					batch.Delete(skv.RawTtlEntry(v.Key[9:]))
 

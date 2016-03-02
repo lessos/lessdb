@@ -18,6 +18,7 @@ import (
 	"encoding/binary"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/lessos/lessdb/skv"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -47,29 +48,29 @@ func (db *DB) _raw_get(key []byte) *skv.Reply {
 	return rpl
 }
 
-func (db *DB) _raw_put(key, value []byte, ttl uint32) *skv.Reply {
+func (db *DB) _raw_put(key, value []byte, ttl int64) *skv.Reply {
 
 	rpl := skv.NewReply("")
 
 	if len(key) < 2 {
-		rpl.Status = skv.ReplyInvalidArgument
+		rpl.Status = skv.ReplyBadArgument
 		return rpl
 	}
 
 	if ttl > 0 {
 
-		if ttl < 300 {
+		if ttl < 1000 {
 			return rpl
 		}
 
 		switch key[0] {
 		case skv.NsKvEntry:
 			if ok := db._raw_ssttl_put(key[0], key[1:], ttl); !ok {
-				rpl.Status = skv.ReplyInvalidArgument
+				rpl.Status = skv.ReplyBadArgument
 				return rpl
 			}
 		default:
-			rpl.Status = skv.ReplyInvalidArgument
+			rpl.Status = skv.ReplyBadArgument
 			return rpl
 		}
 	}
@@ -81,7 +82,7 @@ func (db *DB) _raw_put(key, value []byte, ttl uint32) *skv.Reply {
 	return rpl
 }
 
-func (db *DB) _raw_put_json(key []byte, value interface{}, ttl uint32) *skv.Reply {
+func (db *DB) _raw_put_json(key []byte, value interface{}, ttl int64) *skv.Reply {
 
 	bvalue, err := skv.JsonEncode(value)
 	if err != nil {
@@ -237,48 +238,58 @@ func (db *DB) _raw_ssttl_get(ns byte, key []byte) *skv.Reply {
 
 	key = skv.RawNsKeyConcat(ns, key)
 
-	ttl := db._raw_get(skv.RawTtlEntry(key)).Int64() - int64(skv.TimeNowMS())
+	rpl, ttl := skv.NewReply(""), int64(0)
+
+	if ttlat := skv.BytesToUint64(db._raw_get(skv.RawTtlEntry(key)).Bytes()); ttlat > 10000000000000 {
+		ttl = (skv.MetaTimeParse(ttlat).UnixNano() - time.Now().UTC().UnixNano()) / 1e6
+	}
+
 	if ttl < 0 {
 		ttl = 0
 	}
-
-	rpl := skv.NewReply("")
 
 	rpl.Data = append(rpl.Data, []byte(strconv.FormatInt(ttl, 10)))
 
 	return rpl
 }
 
-func (db *DB) _raw_ssttl_put(ns byte, key []byte, ttl uint32) bool {
+func (db *DB) _raw_ssttl_put(ns byte, key []byte, ttl int64) bool {
+
+	if ttl < 1 {
+		return true
+	}
+
+	if ttl > 0 && ttl < 1000 {
+		ttl = 1000
+	}
 
 	key = skv.RawNsKeyConcat(ns, key)
 
-	if ttl > 1000 {
+	ttlat := skv.MetaTimeNowAddMS(ttl)
 
-		tto := skv.TimeNowMS() + uint64(ttl)
+	batch := new(leveldb.Batch)
 
-		batch := new(leveldb.Batch)
-
-		//
-		if prev := db._raw_get(skv.RawTtlEntry(key)); prev.Status == skv.ReplyOK && prev.Uint64() != tto {
-			batch.Delete(skv.RawTtlQueue(key, prev.Uint64()))
+	//
+	if prev := db._raw_get(skv.RawTtlEntry(key)); prev.Status == skv.ReplyOK {
+		if prev_ttlat := skv.BytesToUint64(prev.Bytes()); prev_ttlat != ttlat {
+			batch.Delete(skv.RawTtlQueue(key, prev_ttlat))
 		}
+	}
 
-		//
-		batch.Put(skv.RawTtlQueue(key, tto), []byte{})
+	//
+	batch.Put(skv.RawTtlQueue(key, ttlat), []byte{})
 
-		//
-		batch.Put(skv.RawTtlEntry(key), []byte(strconv.FormatUint(tto, 10)))
+	//
+	batch.Put(skv.RawTtlEntry(key), skv.Uint64ToBytes(ttlat))
 
-		if err := db.ldb.Write(batch, nil); err != nil {
-			return false
-		}
+	if err := db.ldb.Write(batch, nil); err != nil {
+		return false
 	}
 
 	return true
 }
 
-func (db *DB) _raw_ssttl_range(score_start, score_end, limit uint64) *skv.Reply {
+func (db *DB) _raw_ssttlat_range(score_start, score_end, limit uint64) *skv.Reply {
 
 	var (
 		bs_start = skv.RawTtlQueuePrefix(score_start)

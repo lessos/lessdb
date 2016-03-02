@@ -19,9 +19,9 @@ import (
 )
 
 const (
-	ReplyOK              = "OK"
-	ReplyNotFound        = "NotFound"
-	ReplyInvalidArgument = "InvalidArgument"
+	ReplyOK          = "OK"
+	ReplyNotFound    = "NotFound"
+	ReplyBadArgument = "BadArgument"
 )
 
 type Reply struct {
@@ -151,8 +151,8 @@ func (r *Reply) Object() *Object {
 		Meta:   ObjectMetaParse(r.Bytes()),
 	}
 
-	if o.Meta.seek_len > 0 {
-		o.entryValue = r.Bytes()[int(o.Meta.seek_len):]
+	if o.Meta.seek > 0 {
+		o.entryValue = r.Bytes()[o.Meta.seek:]
 	}
 
 	return o
@@ -169,8 +169,8 @@ func (r *Reply) ObjectList() []*Object {
 			Key:  r.Data[i],
 		}
 
-		if o.Meta.seek_len > 0 {
-			o.entryValue = r.Data[i+1][int(o.Meta.seek_len):]
+		if o.Meta.seek > 0 {
+			o.entryValue = r.Data[i+1][o.Meta.seek:]
 		}
 
 		ls = append(ls, o)

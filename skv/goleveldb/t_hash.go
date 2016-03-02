@@ -23,7 +23,7 @@ func (db *DB) HashGet(key, field []byte) *skv.Reply {
 	return db._raw_get(skv.HashNsEntryKey(key, field))
 }
 
-func (db *DB) HashPut(key, field, value []byte, ttl uint32) *skv.Reply {
+func (db *DB) HashPut(key, field, value []byte, ttl int64) *skv.Reply {
 
 	bkey := skv.HashNsEntryKey(key, field)
 
@@ -34,7 +34,7 @@ func (db *DB) HashPut(key, field, value []byte, ttl uint32) *skv.Reply {
 	return db._raw_put(bkey, value, 0)
 }
 
-func (db *DB) HashPutJson(key, field []byte, value interface{}, ttl uint32) *skv.Reply {
+func (db *DB) HashPutJson(key, field []byte, value interface{}, ttl int64) *skv.Reply {
 
 	bkey := skv.HashNsEntryKey(key, field)
 
