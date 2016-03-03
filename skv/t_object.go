@@ -39,9 +39,9 @@ type ObjectInterface interface {
 	//
 	ObjectMetaGet(path string) *Reply
 	ObjectMetaScan(fold, cursor, end string, limit uint32) *Reply
-	ObjectJournalScan(bucket string, place_group uint32, start, end uint64, limit uint32) *Reply
-	ObjectJournalVersionIncr(path string, pgsize uint32, step int64) *Reply
-	ObjectGroupStatus(bucket string, place_group uint32) *Reply
+	ObjectMetaVersionIncr(path string, group_number uint32, step int64) *Reply
+	ObjectGroupStatus(bucket string, group_number uint32) *Reply
+	ObjectLogScan(bucket string, group_number uint32, start, end uint64, limit uint32) *ObjectLogReply
 }
 
 type ObjectDocInterface interface {
@@ -57,9 +57,15 @@ type ObjectEventHandler func(opath *ObjectPath, evtype uint8, version uint64)
 type ObjectWriteOptions struct {
 	Ttl               int64
 	Version           uint64
-	JournalEnable     bool
+	LogEnable         bool
 	GroupNumber       uint32
 	GroupStatusEnable bool
+}
+
+type ObjectLogReply struct {
+	Reply
+	Offset uint64
+	Offcut uint64
 }
 
 //
@@ -71,8 +77,10 @@ type ObjectPath struct {
 }
 
 type ObjectGroupStatus struct {
-	Size uint64 `json:"size"`
-	Num  uint64 `json:"num"`
+	Size       uint64 `json:"size"`
+	Num        uint64 `json:"num"`
+	ObjVersion uint64 `json:"obj_version"`
+	LogVersion uint64 `json:"log_version"`
 }
 
 func (op *ObjectPath) EntryIndex() []byte {
@@ -109,12 +117,16 @@ func (op *ObjectPath) BucketID() uint32 {
 	return BytesToUint32(op.BucketBytes())
 }
 
-func (op *ObjectPath) NsJournalVersionIndex(group_number uint32) []byte {
-	return BytesConcat([]byte{NsObjectJournalVersion}, op.BucketBytes(), Uint32ToBytes(group_number))
+func (op *ObjectPath) NsVersionCounterIndex(group_number uint32) []byte {
+	return BytesConcat([]byte{NsObjectVersionCounter}, op.BucketBytes(), Uint32ToBytes(group_number))
 }
 
-func (op *ObjectPath) NsJournalEntryIndex(group_number uint32, version uint64) []byte {
-	return BytesConcat([]byte{NsObjectJournal}, op.BucketBytes(), Uint32ToBytes(group_number), Uint64ToBytes(version))
+func (op *ObjectPath) NsLogCounterIndex(group_number uint32) []byte {
+	return BytesConcat([]byte{NsObjectLogCounter}, op.BucketBytes(), Uint32ToBytes(group_number))
+}
+
+func (op *ObjectPath) NsLogEntryIndex(group_number uint32, num uint64) []byte {
+	return BytesConcat([]byte{NsObjectLogEntry}, op.BucketBytes(), Uint32ToBytes(group_number), Uint64ToBytes(num))
 }
 
 func (op *ObjectPath) NsGroupStatusIndex(group_number uint32) []byte {

@@ -32,9 +32,10 @@ const (
 	NsHashLength           = 0x21
 	NsObjectEntry          = 0x30
 	NsObjectMeta           = 0x31
-	NsObjectJournal        = 0x32
-	NsObjectJournalVersion = 0x33
-	NsObjectGroupStatus    = 0x34
+	NsObjectVersionCounter = 0x32
+	NsObjectLogEntry       = 0x33
+	NsObjectLogCounter     = 0x34
+	NsObjectGroupStatus    = 0x35
 	nsObjectDocSchema      = 0x38
 	nsObjectDocIndex       = 0x39
 	nsObjectDocIncrement   = 0x3a
