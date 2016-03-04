@@ -16,6 +16,7 @@ package goleveldb
 
 import (
 	"fmt"
+	"hash/crc32"
 	"sync"
 
 	"github.com/lessos/lessdb/skv"
@@ -80,9 +81,21 @@ func (db *DB) ObjectPut(path string, value interface{}, opts *skv.ObjectWriteOpt
 		return skv.NewReply(skv.ReplyBadArgument)
 	}
 
+	if opts.Expired == 0 && opts.Ttl > 0 {
+		opts.Expired = skv.MetaTimeNowAddMS(opts.Ttl)
+	}
+
 	meta := db._raw_get(mkey).ObjectMeta()
 
-	db._obj_meta_sync(skv.ObjectTypeGeneral, &meta, opath, int64(len(bvalue)), opts)
+	sum := crc32.ChecksumIEEE(bvalue)
+
+	if meta.Expired == opts.Expired && meta.Sum == sum {
+		return skv.NewReply(skv.ReplyOK)
+	}
+
+	db._obj_meta_sync(skv.ObjectTypeGeneral, &meta, opath, int64(len(bvalue)), sum, opts)
+
+	meta.Sum = sum
 
 	return db._raw_put(bkey, append(meta.Export(), bvalue...), 0)
 }
@@ -103,7 +116,7 @@ func (db *DB) ObjectDel(path string) *skv.Reply {
 
 		ms := rs.ObjectMeta()
 
-		db._obj_meta_sync(ms.Type, &ms, opath, -1, _obj_options_def)
+		db._obj_meta_sync(ms.Type, &ms, opath, -1, 0, _obj_options_def)
 
 		if _obj_event_handler != nil {
 			_obj_event_handler(opath, skv.ObjectEventDeleted, 0)
@@ -357,7 +370,7 @@ func (db *DB) _obj_group_status_sync(bucket_bytes []byte, group_number uint32, e
 	db._raw_put_json(key, st, 0)
 }
 
-func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.ObjectPath, size int64, opts *skv.ObjectWriteOptions) string {
+func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.ObjectPath, size int64, sum uint32, opts *skv.ObjectWriteOptions) string {
 
 	//
 	if meta.Type > 0 {
@@ -376,7 +389,11 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 			meta.Created = skv.MetaTimeNow()
 		}
 
-		meta.Updated = skv.MetaTimeNow()
+		if opts.Updated > 0 {
+			meta.Updated = opts.Updated
+		} else {
+			meta.Updated = skv.MetaTimeNow()
+		}
 
 		meta.Num = 0
 
@@ -529,13 +546,14 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 
 	if size >= 0 {
 
-		if ok := db._raw_ssttl_put(skv.NsObjectEntry, []byte(opath.EntryPath()), opts.Ttl); !ok {
+		if ok := db._raw_ssttlat_put(skv.NsObjectEntry, []byte(opath.EntryPath()), opts.Expired); !ok {
 			return "ServerError TTL Set"
 		}
 
-		meta.Ttl = opts.Ttl
+		// fmt.Println("meta diff", gstatus_size, ",", meta.Sum, sum, ",", meta.Expired, opts.Expired, opath.EntryPath())
 
-		if opts.LogEnable && meta.Version > 0 {
+		if opts.LogEnable && meta.Version > 0 &&
+			(gstatus_size != 0 || meta.Sum != sum || meta.Expired != opts.Expired) {
 
 			if meta.LogVersion > 0 {
 				batch.Delete(opath.NsLogEntryIndex(opts.GroupNumber, meta.LogVersion))
@@ -546,6 +564,9 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 			batch.Put(opath.NsLogEntryIndex(opts.GroupNumber, meta.LogVersion), []byte(opath.EntryPath()))
 		}
 
+		// refresh meta index
+		meta.Expired = opts.Expired
+		meta.Sum = sum
 		batch.Put(opath.MetaIndex(), meta.Export())
 
 	} else {

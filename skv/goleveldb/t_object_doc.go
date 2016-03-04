@@ -17,6 +17,7 @@ package goleveldb
 import (
 	"bytes"
 	"encoding/binary"
+	"hash/crc32"
 	"reflect"
 	"strconv"
 	"sync"
@@ -371,7 +372,13 @@ func (db *DB) ObjectDocPut(fold, key string, obj interface{}, opts *skv.ObjectWr
 	}
 
 	bvalue, _ := skv.JsonEncode(set)
-	db._obj_meta_sync(skv.ObjectTypeDocument, &prevobj.Meta, opath, int64(len(bvalue)), _obj_options_def)
+	sum := crc32.ChecksumIEEE(bvalue)
+
+	if prevobj.Meta.Sum == sum {
+		return skv.NewReply(skv.ReplyOK)
+	}
+
+	db._obj_meta_sync(skv.ObjectTypeDocument, &prevobj.Meta, opath, int64(len(bvalue)), sum, _obj_options_def)
 
 	batch.Put(bkey, append(prevobj.Meta.Export(), bvalue...))
 
@@ -422,7 +429,7 @@ func (db *DB) ObjectDocDel(fold, key string) *skv.Reply {
 	if err := db.ldb.Write(batch, nil); err != nil {
 		rpl.Status = err.Error()
 	} else {
-		db._obj_meta_sync(prevobj.Meta.Type, &prevobj.Meta, opath, -1, _obj_options_def)
+		db._obj_meta_sync(prevobj.Meta.Type, &prevobj.Meta, opath, -1, 0, _obj_options_def)
 
 		// if _obj_event_handler != nil {
 		//     _obj_event_handler(opath, skv.ObjectEventDeleted, 0)

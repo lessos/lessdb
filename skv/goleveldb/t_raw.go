@@ -65,7 +65,7 @@ func (db *DB) _raw_put(key, value []byte, ttl int64) *skv.Reply {
 
 		switch key[0] {
 		case skv.NsKvEntry:
-			if ok := db._raw_ssttl_put(key[0], key[1:], ttl); !ok {
+			if ok := db._raw_ssttlat_put(key[0], key[1:], skv.MetaTimeNowAddMS(ttl)); !ok {
 				rpl.Status = skv.ReplyBadArgument
 				return rpl
 			}
@@ -240,7 +240,7 @@ func (db *DB) _raw_ssttl_get(ns byte, key []byte) *skv.Reply {
 
 	rpl, ttl := skv.NewReply(""), int64(0)
 
-	if ttlat := skv.BytesToUint64(db._raw_get(skv.RawTtlEntry(key)).Bytes()); ttlat > 10000000000000 {
+	if ttlat := skv.BytesToUint64(db._raw_get(skv.RawTtlEntry(key)).Bytes()); ttlat > 0 {
 		ttl = (skv.MetaTimeParse(ttlat).UnixNano() - time.Now().UTC().UnixNano()) / 1e6
 	}
 
@@ -253,19 +253,13 @@ func (db *DB) _raw_ssttl_get(ns byte, key []byte) *skv.Reply {
 	return rpl
 }
 
-func (db *DB) _raw_ssttl_put(ns byte, key []byte, ttl int64) bool {
+func (db *DB) _raw_ssttlat_put(ns byte, key []byte, ttlat uint64) bool {
 
-	if ttl < 1 {
+	if ttlat == 0 {
 		return true
 	}
 
-	if ttl > 0 && ttl < 1000 {
-		ttl = 1000
-	}
-
 	key = skv.RawNsKeyConcat(ns, key)
-
-	ttlat := skv.MetaTimeNowAddMS(ttl)
 
 	batch := new(leveldb.Batch)
 

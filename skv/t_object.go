@@ -55,6 +55,8 @@ type ObjectDocInterface interface {
 type ObjectEventHandler func(opath *ObjectPath, evtype uint8, version uint64)
 
 type ObjectWriteOptions struct {
+	Updated           uint64
+	Expired           uint64
 	Ttl               int64
 	Version           uint64
 	LogEnable         bool
