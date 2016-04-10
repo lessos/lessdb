@@ -160,7 +160,7 @@ func ObjectMetaParse(data []byte) ObjectMeta {
 		m.Size = binary.BigEndian.Uint64(data[44:52])
 
 		//
-		if m.Expired > 10000000000000 {
+		if m.Expired > 0 {
 			m.Ttl = (MetaTimeParse(m.Expired).UnixNano() - time.Now().UTC().UnixNano()) / 1e6
 		}
 
