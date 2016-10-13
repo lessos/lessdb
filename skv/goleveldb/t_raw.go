@@ -82,7 +82,7 @@ func (db *DB) RawPut(key, value []byte, ttl int64) *skv.Reply {
 	return rpl
 }
 
-func (db *DB) RawPut_json(key []byte, value interface{}, ttl int64) *skv.Reply {
+func (db *DB) _raw_put_json(key []byte, value interface{}, ttl int64) *skv.Reply {
 
 	bvalue, err := skv.JsonEncode(value)
 	if err != nil {
