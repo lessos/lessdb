@@ -29,7 +29,7 @@ var (
 	_raw_incr_locker sync.Mutex
 )
 
-func (db *DB) _raw_get(key []byte) *skv.Reply {
+func (db *DB) RawGet(key []byte) *skv.Reply {
 
 	rpl := skv.NewReply("")
 
@@ -48,7 +48,7 @@ func (db *DB) _raw_get(key []byte) *skv.Reply {
 	return rpl
 }
 
-func (db *DB) _raw_put(key, value []byte, ttl int64) *skv.Reply {
+func (db *DB) RawPut(key, value []byte, ttl int64) *skv.Reply {
 
 	rpl := skv.NewReply("")
 
@@ -82,14 +82,14 @@ func (db *DB) _raw_put(key, value []byte, ttl int64) *skv.Reply {
 	return rpl
 }
 
-func (db *DB) _raw_put_json(key []byte, value interface{}, ttl int64) *skv.Reply {
+func (db *DB) RawPut_json(key []byte, value interface{}, ttl int64) *skv.Reply {
 
 	bvalue, err := skv.JsonEncode(value)
 	if err != nil {
 		return skv.NewReply(err.Error())
 	}
 
-	return db._raw_put(key, bvalue, ttl)
+	return db.RawPut(key, bvalue, ttl)
 }
 
 func (db *DB) _raw_del(keys ...[]byte) *skv.Reply {
@@ -109,7 +109,7 @@ func (db *DB) _raw_del(keys ...[]byte) *skv.Reply {
 	return rpl
 }
 
-func (db *DB) _raw_scan(cursor, end []byte, limit uint32) *skv.Reply {
+func (db *DB) RawScan(cursor, end []byte, limit uint32) *skv.Reply {
 
 	rpl := skv.NewReply("")
 
@@ -148,7 +148,7 @@ func (db *DB) _raw_scan(cursor, end []byte, limit uint32) *skv.Reply {
 	return rpl
 }
 
-func (db *DB) _raw_revscan(cursor, end []byte, limit uint32) *skv.Reply {
+func (db *DB) RawRevScan(cursor, end []byte, limit uint32) *skv.Reply {
 
 	rpl := skv.NewReply("")
 
@@ -202,7 +202,7 @@ func (db *DB) _raw_incrby(key []byte, step int64) *skv.Reply {
 
 	num := uint64(0)
 
-	rpl := db._raw_get(key)
+	rpl := db.RawGet(key)
 	if rpl.Status == skv.ReplyOK {
 		num = rpl.Uint64()
 	}
@@ -226,7 +226,7 @@ func (db *DB) _raw_incrby(key []byte, step int64) *skv.Reply {
 	}
 
 	bnum := []byte(strconv.FormatUint(num, 10))
-	rpl = db._raw_put(key, bnum, 0)
+	rpl = db.RawPut(key, bnum, 0)
 	if rpl.Status == skv.ReplyOK {
 		rpl.Data = append(rpl.Data, bnum)
 	}
@@ -240,7 +240,7 @@ func (db *DB) _raw_ssttl_get(ns byte, key []byte) *skv.Reply {
 
 	rpl, ttl := skv.NewReply(""), int64(0)
 
-	if ttlat := skv.BytesToUint64(db._raw_get(skv.RawTtlEntry(key)).Bytes()); ttlat > 0 {
+	if ttlat := skv.BytesToUint64(db.RawGet(skv.RawTtlEntry(key)).Bytes()); ttlat > 0 {
 		ttl = (skv.MetaTimeParse(ttlat).UnixNano() - time.Now().UTC().UnixNano()) / 1e6
 	}
 
@@ -264,7 +264,7 @@ func (db *DB) _raw_ssttlat_put(ns byte, key []byte, ttlat uint64) bool {
 	batch := new(leveldb.Batch)
 
 	//
-	if prev := db._raw_get(skv.RawTtlEntry(key)); prev.Status == skv.ReplyOK {
+	if prev := db.RawGet(skv.RawTtlEntry(key)); prev.Status == skv.ReplyOK {
 		if prev_ttlat := skv.BytesToUint64(prev.Bytes()); prev_ttlat != ttlat {
 			batch.Delete(skv.RawTtlQueue(key, prev_ttlat))
 		}

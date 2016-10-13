@@ -38,7 +38,7 @@ func (db *DB) ttl_worker() {
 
 				batch := new(leveldb.Batch)
 
-				if skv.BytesToUint64(db._raw_get(skv.RawTtlEntry(v.Key[9:])).Bytes()) == v.Uint64() {
+				if skv.BytesToUint64(db.RawGet(skv.RawTtlEntry(v.Key[9:])).Bytes()) == v.Uint64() {
 
 					batch.Delete(skv.RawTtlEntry(v.Key[9:]))
 

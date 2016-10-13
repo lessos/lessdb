@@ -20,25 +20,25 @@ import (
 )
 
 func (db *DB) HashGet(key, field []byte) *skv.Reply {
-	return db._raw_get(skv.HashNsEntryKey(key, field))
+	return db.RawGet(skv.HashNsEntryKey(key, field))
 }
 
 func (db *DB) HashPut(key, field, value []byte, ttl int64) *skv.Reply {
 
 	bkey := skv.HashNsEntryKey(key, field)
 
-	if rs := db._raw_get(bkey); rs.Status == skv.ReplyNotFound {
+	if rs := db.RawGet(bkey); rs.Status == skv.ReplyNotFound {
 		db._raw_incrby(skv.HashNsLengthKey(key), 1)
 	}
 
-	return db._raw_put(bkey, value, 0)
+	return db.RawPut(bkey, value, 0)
 }
 
 func (db *DB) HashPutJson(key, field []byte, value interface{}, ttl int64) *skv.Reply {
 
 	bkey := skv.HashNsEntryKey(key, field)
 
-	if rs := db._raw_get(bkey); rs.Status == skv.ReplyNotFound {
+	if rs := db.RawGet(bkey); rs.Status == skv.ReplyNotFound {
 		db._raw_incrby(skv.HashNsLengthKey(key), 1)
 	}
 
@@ -49,7 +49,7 @@ func (db *DB) HashDel(key, field []byte) *skv.Reply {
 
 	bkey := skv.HashNsEntryKey(key, field)
 
-	if rs := db._raw_get(bkey); rs.Status == skv.ReplyOK {
+	if rs := db.RawGet(bkey); rs.Status == skv.ReplyOK {
 		db._raw_incrby(skv.HashNsLengthKey(key), -1)
 		return db._raw_del(bkey)
 	}
@@ -103,5 +103,5 @@ func (db *DB) HashScan(key, cursor, end []byte, limit uint32) *skv.Reply {
 }
 
 func (db *DB) HashLen(key []byte) *skv.Reply {
-	return db._raw_get(skv.HashNsLengthKey(key))
+	return db.RawGet(skv.HashNsLengthKey(key))
 }

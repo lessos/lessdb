@@ -40,7 +40,7 @@ func (db *DB) ObjectEventRegister(ev skv.ObjectEventHandler) {
 }
 
 func (db *DB) ObjectGet(path string) *skv.Reply {
-	return db._raw_get(skv.NewObjectPathParse(path).EntryIndex())
+	return db.RawGet(skv.NewObjectPathParse(path).EntryIndex())
 }
 
 func (db *DB) ObjectPut(path string, value interface{}, opts *skv.ObjectWriteOptions) *skv.Reply {
@@ -85,7 +85,7 @@ func (db *DB) ObjectPut(path string, value interface{}, opts *skv.ObjectWriteOpt
 		opts.Expired = skv.MetaTimeNowAddMS(opts.Ttl)
 	}
 
-	meta := db._raw_get(mkey).ObjectMeta()
+	meta := db.RawGet(mkey).ObjectMeta()
 
 	sum := crc32.ChecksumIEEE(bvalue)
 
@@ -97,7 +97,7 @@ func (db *DB) ObjectPut(path string, value interface{}, opts *skv.ObjectWriteOpt
 
 	meta.Sum = sum
 
-	return db._raw_put(bkey, append(meta.Export(), bvalue...), 0)
+	return db.RawPut(bkey, append(meta.Export(), bvalue...), 0)
 }
 
 func (db *DB) ObjectDel(path string) *skv.Reply {
@@ -107,7 +107,7 @@ func (db *DB) ObjectDel(path string) *skv.Reply {
 		opath = skv.NewObjectPathParse(path)
 	)
 
-	if rs := db._raw_get(opath.MetaIndex()); rs.Status == skv.ReplyOK {
+	if rs := db.RawGet(opath.MetaIndex()); rs.Status == skv.ReplyOK {
 
 		rpl = db._raw_del(opath.EntryIndex())
 		if rpl.Status != skv.ReplyOK {
@@ -235,7 +235,7 @@ func (db *DB) ObjectLogScan(bucket string, pg_num uint32, start, end uint64, lim
 	//
 	for _, key := range keys {
 
-		r := db._raw_get(skv.NewObjectPathParse(string(key.path)).EntryIndex())
+		r := db.RawGet(skv.NewObjectPathParse(string(key.path)).EntryIndex())
 
 		if key.version > rpl.Offcut {
 			rpl.Offcut = key.version
@@ -263,7 +263,7 @@ func (db *DB) ObjectLogScan(bucket string, pg_num uint32, start, end uint64, lim
 }
 
 func (db *DB) ObjectMetaGet(path string) *skv.Reply {
-	return db._raw_get(skv.NewObjectPathParse(path).MetaIndex())
+	return db.RawGet(skv.NewObjectPathParse(path).MetaIndex())
 }
 
 func (db *DB) ObjectMetaScan(fold, cursor, end string, limit uint32) *skv.Reply {
@@ -316,7 +316,7 @@ func (db *DB) ObjectMetaVersionIncr(path string, group_number uint32, step int64
 }
 
 func (db *DB) ObjectGroupStatus(bucket string, group_number uint32) *skv.Reply {
-	return db._raw_get(skv.NewObjectPathParse(bucket + "/0").NsGroupStatusIndex(group_number))
+	return db.RawGet(skv.NewObjectPathParse(bucket + "/0").NsGroupStatusIndex(group_number))
 }
 
 func (db *DB) _obj_group_status_sync(bucket_bytes []byte, group_number uint32, evtype uint8, size int64,
@@ -339,7 +339,7 @@ func (db *DB) _obj_group_status_sync(bucket_bytes []byte, group_number uint32, e
 	)
 
 	// TOPO
-	if rs := db._raw_get(key); rs.Status == skv.ReplyOK {
+	if rs := db.RawGet(key); rs.Status == skv.ReplyOK {
 		rs.JsonDecode(&st)
 	} else if rs.Status != skv.ReplyNotFound {
 		return
@@ -406,7 +406,7 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 	var (
 		fold_size     int64 = 0
 		fold_path           = opath.Parent()
-		fold_meta           = db._raw_get(fold_path.MetaIndex()).ObjectMeta()
+		fold_meta           = db.RawGet(fold_path.MetaIndex()).ObjectMeta()
 		gstatus_event       = skv.ObjectEventNone
 		gstatus_size  int64 = 0
 	)
@@ -445,7 +445,7 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 			}
 
 			//
-			pfp_meta := db._raw_get(pfp.MetaIndex()).ObjectMeta()
+			pfp_meta := db.RawGet(pfp.MetaIndex()).ObjectMeta()
 			if pfp_meta.Type > 0 && pfp_meta.Type != skv.ObjectTypeFold {
 				return skv.ReplyBadArgument
 			}
@@ -475,8 +475,8 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 
 				// fmt.Println(pfp.FoldName, pfp.FieldName)
 
-				db._raw_put(pfp.EntryIndex(), pfp_meta.Export(), 0)
-				db._raw_put(pfp.MetaIndex(), pfp_meta.Export(), 0)
+				db.RawPut(pfp.EntryIndex(), pfp_meta.Export(), 0)
+				db.RawPut(pfp.MetaIndex(), pfp_meta.Export(), 0)
 
 				if found {
 					break
@@ -488,8 +488,8 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 
 					pfp_meta.Num--
 
-					db._raw_put(pfp.EntryIndex(), pfp_meta.Export(), 0)
-					db._raw_put(pfp.MetaIndex(), pfp_meta.Export(), 0)
+					db.RawPut(pfp.EntryIndex(), pfp_meta.Export(), 0)
+					db.RawPut(pfp.MetaIndex(), pfp_meta.Export(), 0)
 
 					break
 				}

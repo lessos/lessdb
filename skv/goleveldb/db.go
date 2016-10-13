@@ -37,9 +37,9 @@ func Open(cfg skv.Config) (*DB, error) {
 
 	cfg.ReFix()
 
-	os.MkdirAll(cfg.DataDir+"/0.0", 0750)
+	os.MkdirAll(cfg.DataDir+cfg.DataDirGroup, 0750)
 
-	db.ldb, err = leveldb.OpenFile(cfg.DataDir+"/0.0", &opt.Options{
+	db.ldb, err = leveldb.OpenFile(cfg.DataDir+cfg.DataDirGroup, &opt.Options{
 		WriteBuffer:            cfg.WriteBuffer * opt.MiB,
 		BlockCacheCapacity:     cfg.BlockCacheCapacity * opt.MiB,
 		OpenFilesCacheCapacity: cfg.OpenFilesCacheCapacity,

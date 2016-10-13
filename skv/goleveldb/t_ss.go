@@ -24,7 +24,7 @@ import (
 )
 
 func (db *DB) SsGet(key, member []byte) *skv.Reply {
-	return db._raw_get(skv.SortSetsNsEntryKey(key, member))
+	return db.RawGet(skv.SortSetsNsEntryKey(key, member))
 }
 
 func (db *DB) SsPut(key, member []byte, score uint64) *skv.Reply {
@@ -118,5 +118,5 @@ func (db *DB) SsDel(key, member []byte) *skv.Reply {
 }
 
 func (db *DB) SsLen(key []byte) *skv.Reply {
-	return db._raw_get(skv.SortSetsNsLengthKey(key))
+	return db.RawGet(skv.SortSetsNsLengthKey(key))
 }

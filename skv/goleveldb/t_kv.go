@@ -19,11 +19,11 @@ import (
 )
 
 func (db *DB) KvGet(key []byte) *skv.Reply {
-	return db._raw_get(skv.RawNsKeyConcat(skv.NsKvEntry, key))
+	return db.RawGet(skv.RawNsKeyConcat(skv.NsKvEntry, key))
 }
 
 func (db *DB) KvPut(key, value []byte, ttl int64) *skv.Reply {
-	return db._raw_put(skv.RawNsKeyConcat(skv.NsKvEntry, key), value, ttl)
+	return db.RawPut(skv.RawNsKeyConcat(skv.NsKvEntry, key), value, ttl)
 }
 
 func (db *DB) KvPutJson(key []byte, value interface{}, ttl int64) *skv.Reply {
@@ -32,7 +32,7 @@ func (db *DB) KvPutJson(key []byte, value interface{}, ttl int64) *skv.Reply {
 
 func (db *DB) KvScan(cursor, end []byte, limit uint32) *skv.Reply {
 
-	rpl := db._raw_scan(skv.RawNsKeyConcat(skv.NsKvEntry, cursor), skv.RawNsKeyConcat(skv.NsKvEntry, end), limit)
+	rpl := db.RawScan(skv.RawNsKeyConcat(skv.NsKvEntry, cursor), skv.RawNsKeyConcat(skv.NsKvEntry, end), limit)
 
 	if len(rpl.Data) > 0 && len(rpl.Data)%2 == 0 {
 		for i := 0; i < len(rpl.Data); i += 2 {

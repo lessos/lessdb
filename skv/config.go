@@ -17,17 +17,19 @@ package skv
 type Config struct {
 	Driver                 string `json:"driver,omitempty"`
 	DataDir                string `json:"datadir,omitempty"`
-	WriteBuffer            int    `json:"write_buffer,omitempty"`
-	BlockCacheCapacity     int    `json:"block_cache_capacity,omitempty"`
-	CacheCapacity          int    `json:"cache_capacity,omitempty"`
-	OpenFilesCacheCapacity int    `json:"open_files_cache_capacity,omitempty"`
-	CompactionTableSize    int    `json:"compaction_table_size,omitempty"`
+	DataDirGroup           string
+	WriteBuffer            int `json:"write_buffer,omitempty"`
+	BlockCacheCapacity     int `json:"block_cache_capacity,omitempty"`
+	CacheCapacity          int `json:"cache_capacity,omitempty"`
+	OpenFilesCacheCapacity int `json:"open_files_cache_capacity,omitempty"`
+	CompactionTableSize    int `json:"compaction_table_size,omitempty"`
 }
 
 var (
 	DefaultConfig = Config{
 		Driver:                 "goleveldb",
 		DataDir:                "./var",
+		DataDirGroup:           "/0.0",
 		WriteBuffer:            4,   // 4 MiB
 		CacheCapacity:          8,   // 8 MiB
 		OpenFilesCacheCapacity: 500, // 500

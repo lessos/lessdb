@@ -49,7 +49,7 @@ func (db *DB) ObjectDocSchemaSync(fold string, schema skv.ObjectDocSchema) *skv.
 		return rpl
 	}
 
-	if rs := db._raw_get(skv.ObjectDocSchemaKey(key)); rs.Status == skv.ReplyOK {
+	if rs := db.RawGet(skv.ObjectDocSchemaKey(key)); rs.Status == skv.ReplyOK {
 		rs.JsonDecode(&prev)
 	}
 
@@ -91,7 +91,7 @@ func (db *DB) ObjectDocSchemaSync(fold string, schema skv.ObjectDocSchema) *skv.
 			// fmt.Println("WARN CLEAN prev INDEXES", pi.Column)
 			for {
 
-				rs := db._raw_scan(objIdxKeyPrefix, objIdxKeyPrefix, uint32(limit)).Hash()
+				rs := db.RawScan(objIdxKeyPrefix, objIdxKeyPrefix, uint32(limit)).Hash()
 
 				if len(rs) > 0 {
 					batch := new(leveldb.Batch)
@@ -225,7 +225,7 @@ func (db *DB) ObjectDocSchemaSync(fold string, schema skv.ObjectDocSchema) *skv.
 }
 
 func (db *DB) ObjectDocGet(fold, key string) *skv.Reply {
-	return db._raw_get(skv.NewObjectPathKey(fold, key).EntryIndex())
+	return db.RawGet(skv.NewObjectPathKey(fold, key).EntryIndex())
 }
 
 func (db *DB) ObjectDocPut(fold, key string, obj interface{}, opts *skv.ObjectWriteOptions) *skv.Reply {
@@ -258,7 +258,7 @@ func (db *DB) ObjectDocPut(fold, key string, obj interface{}, opts *skv.ObjectWr
 		opts = _obj_options_def
 	}
 
-	prevobj := db._raw_get(bkey).Object()
+	prevobj := db.RawGet(bkey).Object()
 	if prevobj.Status == skv.ReplyOK {
 
 		if err := prevobj.JsonDecode(&prev); err == nil {
@@ -339,8 +339,8 @@ func (db *DB) ObjectDocPut(fold, key string, obj interface{}, opts *skv.ObjectWr
 
 			} else if incr_set > 0 && incr_set > incr_prev {
 
-				if db._raw_get(skv.ObjectDocIndexIncrKey(opath.Fold, siEntry.Seq)).Uint64() < incr_set {
-					db._raw_put(skv.ObjectDocIndexIncrKey(opath.Fold, siEntry.Seq), []byte(strconv.FormatUint(incr_set, 10)), 0)
+				if db.RawGet(skv.ObjectDocIndexIncrKey(opath.Fold, siEntry.Seq)).Uint64() < incr_set {
+					db.RawPut(skv.ObjectDocIndexIncrKey(opath.Fold, siEntry.Seq), []byte(strconv.FormatUint(incr_set, 10)), 0)
 				}
 			}
 		}
@@ -349,7 +349,7 @@ func (db *DB) ObjectDocPut(fold, key string, obj interface{}, opts *skv.ObjectWr
 
 			objIdxKeyPrefix := append(skv.ObjectDocIndexFieldPrefix(opath.Fold, siKey), siEntry.Data...)
 
-			if rs := db._raw_scan(objIdxKeyPrefix, []byte{}, 1).Hash(); len(rs) > 0 {
+			if rs := db.RawScan(objIdxKeyPrefix, []byte{}, 1).Hash(); len(rs) > 0 {
 				rpl.Status = skv.ReplyBadArgument
 				return rpl
 			}
@@ -399,7 +399,7 @@ func (db *DB) ObjectDocDel(fold, key string) *skv.Reply {
 		previdx = map[uint8]skv.ObjectDocSchemaIndexEntryBytes{}
 	)
 
-	if rs := db._raw_get(bkey); rs.Status == skv.ReplyNotFound {
+	if rs := db.RawGet(bkey); rs.Status == skv.ReplyNotFound {
 
 		return rpl
 
@@ -482,9 +482,9 @@ func (db *DB) ObjectDocQuery(fold string, qry *skv.ObjectDocQuerySet) *skv.Reply
 		for {
 
 			if qry.SortMode == skv.ObjectDocQuerySortAttrDesc {
-				rs = db._raw_revscan(start, end, skv.ObjectDocScanMax).Hash()
+				rs = db.RawRevScan(start, end, skv.ObjectDocScanMax).Hash()
 			} else {
-				rs = db._raw_scan(start, end, skv.ObjectDocScanMax).Hash()
+				rs = db.RawScan(start, end, skv.ObjectDocScanMax).Hash()
 			}
 
 			for _, v := range rs {
@@ -566,7 +566,7 @@ func (db *DB) ObjectDocQuery(fold string, qry *skv.ObjectDocQuerySet) *skv.Reply
 
 		for {
 
-			rs := db._raw_scan(start, end, skv.ObjectDocScanMax).Hash()
+			rs := db.RawScan(start, end, skv.ObjectDocScanMax).Hash()
 
 			for _, v := range rs {
 
