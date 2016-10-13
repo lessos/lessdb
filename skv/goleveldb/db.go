@@ -15,7 +15,6 @@
 package goleveldb
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/lessos/lessdb/skv"
@@ -50,7 +49,7 @@ func Open(cfg skv.Config) (*DB, error) {
 
 	if err == nil {
 		db.ttl_worker()
-		fmt.Println("lessdb/skv.DB " + cfg.DataDir + " opened")
+		// fmt.Println("lessdb/skv.DB " + cfg.DataDir + " opened")
 	}
 
 	return db, err
