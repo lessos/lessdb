@@ -109,7 +109,7 @@ func (db *DB) ObjectDel(path string) *skv.Reply {
 
 	if rs := db.RawGet(opath.MetaIndex()); rs.Status == skv.ReplyOK {
 
-		rpl = db._raw_del(opath.EntryIndex())
+		rpl = db.RawDel(opath.EntryIndex())
 		if rpl.Status != skv.ReplyOK {
 			return rpl
 		}
@@ -213,7 +213,7 @@ func (db *DB) ObjectLogScan(bucket string, pg_num uint32, start, end uint64, lim
 		}
 
 		if len(iter.Value()) < 5 {
-			db._raw_del(iter.Key())
+			db.RawDel(iter.Key())
 			continue
 		}
 
@@ -254,7 +254,7 @@ func (db *DB) ObjectLogScan(bucket string, pg_num uint32, start, end uint64, lim
 				rpl.Data = append(rpl.Data, key.path)
 				rpl.Data = append(rpl.Data, r.Bytes())
 			} else {
-				db._raw_del(append(prefix, skv.Uint64ToBytes(key.version)...))
+				db.RawDel(append(prefix, skv.Uint64ToBytes(key.version)...))
 			}
 		}
 	}
@@ -494,7 +494,7 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 					break
 				}
 
-				db._raw_del(pfp.EntryIndex(), pfp.MetaIndex())
+				db.RawDel(pfp.EntryIndex(), pfp.MetaIndex())
 
 			} else {
 				break

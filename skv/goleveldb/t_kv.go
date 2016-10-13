@@ -49,7 +49,7 @@ func (db *DB) KvDel(keys ...[]byte) *skv.Reply {
 		keys[k] = skv.RawNsKeyConcat(skv.NsKvEntry, v)
 	}
 
-	return db._raw_del(keys...)
+	return db.RawDel(keys...)
 }
 
 func (db *DB) KvIncrby(key []byte, step int64) *skv.Reply {

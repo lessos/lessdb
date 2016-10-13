@@ -92,7 +92,7 @@ func (db *DB) _raw_put_json(key []byte, value interface{}, ttl int64) *skv.Reply
 	return db.RawPut(key, bvalue, ttl)
 }
 
-func (db *DB) _raw_del(keys ...[]byte) *skv.Reply {
+func (db *DB) RawDel(keys ...[]byte) *skv.Reply {
 
 	rpl := skv.NewReply("")
 
@@ -304,7 +304,7 @@ func (db *DB) _raw_ssttlat_range(score_start, score_end, limit uint64) *skv.Repl
 		}
 
 		if len(iter.Key()) < 10 {
-			db._raw_del(iter.Key())
+			db.RawDel(iter.Key())
 			continue
 		}
 

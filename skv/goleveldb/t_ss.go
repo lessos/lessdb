@@ -76,7 +76,7 @@ func (db *DB) SsRange(key []byte, score_start, score_end uint64, limit uint32) *
 		}
 
 		if len(iter.Key()) < (len(key) + 10) {
-			db._raw_del(iter.Key())
+			db.RawDel(iter.Key())
 			continue
 		}
 

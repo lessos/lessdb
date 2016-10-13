@@ -51,7 +51,7 @@ func (db *DB) HashDel(key, field []byte) *skv.Reply {
 
 	if rs := db.RawGet(bkey); rs.Status == skv.ReplyOK {
 		db._raw_incrby(skv.HashNsLengthKey(key), -1)
-		return db._raw_del(bkey)
+		return db.RawDel(bkey)
 	}
 
 	return skv.NewReply("")
