@@ -164,7 +164,7 @@ func (db *DB) RawRevScan(cursor, end []byte, limit uint32) *skv.Reply {
 		end = append(end, 0xff)
 	}
 
-	if limit < skv.ScanLimitMax {
+	if limit > skv.ScanLimitMax {
 		limit = skv.ScanLimitMax
 	}
 
