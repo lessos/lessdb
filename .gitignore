@@ -1,6 +1,7 @@
-/*.go
 /var
+/tmp
 /store
 /redis_bench
 /vendor
 /skv/leveldbgo
+/Godeps
