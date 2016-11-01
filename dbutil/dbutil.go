@@ -1,4 +1,4 @@
-// Copyright 2015 lessOS.com, All rights reserved.
+// Copyright 2015-2016 lessdb Author, All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,12 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package skv
+package dbutil
 
 import (
 	"bytes"
 	"crypto/rand"
-	"crypto/sha1"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -27,58 +26,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 )
-
-const (
-	MetaTimeStd       = "20060102150405.000"
-	meta_time_std_sec = "20060102150405"
-)
-
-func TimeNowMS() uint64 {
-	return uint64(time.Now().UTC().UnixNano() / 1e6)
-}
-
-func MetaTimeNow() uint64 {
-
-	t := time.Now().UTC().Format(MetaTimeStd)
-
-	if u64, err := strconv.ParseUint(t[:14]+t[15:], 10, 64); err == nil {
-		return u64
-	}
-
-	return 0
-}
-
-func MetaTimeNowAddMS(add int64) uint64 {
-
-	t := time.Now().UTC().Add(time.Duration(add * 1e6)).Format(MetaTimeStd)
-
-	if u64, err := strconv.ParseUint(t[:14]+t[15:], 10, 64); err == nil {
-		return u64
-	}
-
-	return 0
-}
-
-func MetaTimeFormat(t uint64, fm string) string {
-
-	if fm == "rfc3339" {
-		fm = time.RFC3339
-	}
-
-	return MetaTimeParse(t).Local().Format(fm)
-}
-
-func MetaTimeParse(t uint64) time.Time {
-
-	tp, err := time.ParseInLocation(meta_time_std_sec, strconv.FormatUint(t/1000, 10), time.UTC)
-	if err != nil {
-		tp = time.Now()
-	}
-
-	return tp
-}
 
 func JsonDecode(src []byte, js interface{}) (err error) {
 
@@ -226,27 +174,4 @@ func Uint32ToBytes(v uint32) []byte {
 	binary.BigEndian.PutUint32(bs, v)
 
 	return bs
-}
-
-func _string_to_hash_bytes(str string, num int) []byte {
-
-	if num < 1 {
-		num = 1
-	} else if num > 20 {
-		num = 20
-	}
-
-	h := sha1.New()
-	io.WriteString(h, str)
-
-	return h.Sum(nil)[:num]
-}
-
-func KeyLenFilter(key []byte) []byte {
-
-	if len(key) < KeyLenMax {
-		return key
-	}
-
-	return key[:KeyLenMax]
 }

@@ -1,4 +1,4 @@
-// Copyright 2015 lessOS.com, All rights reserved.
+// Copyright 2015-2016 lessdb Author, All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,10 +19,12 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/lessos/lessdb/dbutil"
 )
 
 func ObjectDocFoldKey(fold string) []byte {
-	return _string_to_hash_bytes(ObjectPathClean(fold), ObjectFoldLength)
+	return stringToHashBytes(dbutil.ObjectPathClean(fold), ObjectFoldLength)
 }
 
 func ObjectDocSchemaKey(key []byte) []byte {
@@ -129,7 +131,7 @@ func ObjectDocIndexValue(idx *ObjectDocSchemaIndexEntry, value reflect.Value) ([
 		if idx.Type == ObjectDocSchemaIndexTypeUint {
 			ui64, _ = strconv.ParseUint(value.String(), 10, 64)
 		} else {
-			bs = _string_to_hash_bytes(ObjectDocIndexStringFilter(value.String()), 20)
+			bs = stringToHashBytes(ObjectDocIndexStringFilter(value.String()), 20)
 		}
 
 	//

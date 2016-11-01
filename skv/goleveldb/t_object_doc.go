@@ -1,4 +1,4 @@
-// Copyright 2015 lessOS.com, All rights reserved.
+// Copyright 2015-2016 lessdb Author, All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/lessos/lessdb/dbutil"
 	"github.com/lessos/lessdb/skv"
 	"github.com/syndtr/goleveldb/leveldb"
 )
@@ -184,7 +185,7 @@ func (db *DB) ObjectDocSchemaSync(fold string, schema skv.ObjectDocSchema) *skv.
 				for _, entry := range rs {
 
 					var obj map[string]interface{}
-					if err := entry.JsonDecode(&obj); err == nil {
+					if err := entry.Data.JsonDecode(&obj); err == nil {
 
 						for mk, mv := range obj {
 
@@ -195,13 +196,13 @@ func (db *DB) ObjectDocSchemaSync(fold string, schema skv.ObjectDocSchema) *skv.
 							}
 
 							if bs, ok := skv.ObjectDocIndexValue(&ei, reflect.ValueOf(mv)); ok {
-								batch.Put(skv.BytesConcat(skv.ObjectDocIndexFieldPrefix(key, ei.Seq), bs, entry.Key), []byte{})
+								batch.Put(dbutil.BytesConcat(skv.ObjectDocIndexFieldPrefix(key, ei.Seq), bs, entry.Key), []byte{})
 							}
 
 							break
 						}
 
-						offset = skv.BytesToHexString(entry.Key)
+						offset = dbutil.BytesToHexString(entry.Key)
 					}
 				}
 
@@ -261,7 +262,7 @@ func (db *DB) ObjectDocPut(fold, key string, obj interface{}, opts *skv.ObjectWr
 	prevobj := db.RawGet(bkey).Object()
 	if prevobj.Status == skv.ReplyOK {
 
-		if err := prevobj.JsonDecode(&prev); err == nil {
+		if err := prevobj.Data.JsonDecode(&prev); err == nil {
 			previdx = skv.ObjectDocIndexDataExport(_obj_doc_indexes, opath.Fold, prev)
 		}
 	}
@@ -299,7 +300,7 @@ func (db *DB) ObjectDocPut(fold, key string, obj interface{}, opts *skv.ObjectWr
 		var incr_set, incr_prev uint64
 
 		if siEntry.AutoIncr {
-			incr_set = skv.BytesToUint64(siEntry.Data)
+			incr_set = dbutil.BytesToUint64(siEntry.Data)
 		}
 
 		//
@@ -307,7 +308,7 @@ func (db *DB) ObjectDocPut(fold, key string, obj interface{}, opts *skv.ObjectWr
 
 			if siEntry.AutoIncr && incr_set == 0 {
 
-				if incr_prev = skv.BytesToUint64(piEntry.Data); incr_prev > 0 {
+				if incr_prev = dbutil.BytesToUint64(piEntry.Data); incr_prev > 0 {
 
 					siEntry.Data, incr_set = piEntry.Data, incr_prev
 
@@ -328,7 +329,7 @@ func (db *DB) ObjectDocPut(fold, key string, obj interface{}, opts *skv.ObjectWr
 
 			if incr_set == 0 {
 
-				incr_set = db._raw_incrby(skv.ObjectDocIndexIncrKey(opath.Fold, siEntry.Seq), 1).Uint64()
+				incr_set = db.RawIncrby(skv.ObjectDocIndexIncrKey(opath.Fold, siEntry.Seq), 1).Uint64()
 
 				ibs := make([]byte, 8)
 				binary.BigEndian.PutUint64(ibs, incr_set)
@@ -371,7 +372,7 @@ func (db *DB) ObjectDocPut(fold, key string, obj interface{}, opts *skv.ObjectWr
 		batch.Put(idxkey, []byte{})
 	}
 
-	bvalue, _ := skv.JsonEncode(set)
+	bvalue, _ := dbutil.JsonEncode(set)
 	sum := crc32.ChecksumIEEE(bvalue)
 
 	if prevobj.Meta.Sum == sum {
@@ -413,7 +414,7 @@ func (db *DB) ObjectDocDel(fold, key string) *skv.Reply {
 
 		var prev map[string]interface{}
 
-		if err := prevobj.JsonDecode(&prev); err == nil {
+		if err := prevobj.Data.JsonDecode(&prev); err == nil {
 			previdx = skv.ObjectDocIndexDataExport(_obj_doc_indexes, opath.Fold, prev)
 		}
 	}
@@ -477,7 +478,7 @@ func (db *DB) ObjectDocQuery(fold string, qry *skv.ObjectDocQuerySet) *skv.Reply
 
 		start, end := skv.ObjectDocIndexFieldPrefix(key, idx.Seq), skv.ObjectDocIndexFieldPrefix(key, idx.Seq)
 
-		rs := []skv.Entry{}
+		rs := []skv.ReplyEntry{}
 
 		for {
 
@@ -490,7 +491,7 @@ func (db *DB) ObjectDocQuery(fold string, qry *skv.ObjectDocQuerySet) *skv.Reply
 			for _, v := range rs {
 
 				if _, bkey, ok := skv.ObjectDocIndexRawKeyExport(v.Key, idx.Length); ok {
-					sls = append(sls, skv.BytesClone(bkey))
+					sls = append(sls, dbutil.BytesClone(bkey))
 				}
 
 				if qry.SortMode == skv.ObjectDocQuerySortAttrDesc {
@@ -526,7 +527,7 @@ func (db *DB) ObjectDocQuery(fold string, qry *skv.ObjectDocQuerySet) *skv.Reply
 
 		for _, v := range filter.Values {
 
-			vb := skv.SintToBytes(v, idx.Length)
+			vb := dbutil.SintToBytes(v, idx.Length)
 
 			dup := false
 			for _, pvb := range values {
@@ -577,7 +578,7 @@ func (db *DB) ObjectDocQuery(fold string, qry *skv.ObjectDocQuerySet) *skv.Reply
 						fitkeys[string(bkey)] = empty{}
 
 					} else {
-						sls = append(sls, skv.BytesClone(bkey))
+						sls = append(sls, dbutil.BytesClone(bkey))
 					}
 				}
 
@@ -626,7 +627,7 @@ func (db *DB) ObjectDocQuery(fold string, qry *skv.ObjectDocQuerySet) *skv.Reply
 	}
 
 	for i := qry.Offset; i < cutoff; i++ {
-		if rs := db.ObjectDocGet(fold, skv.BytesToHexString(sls[i])); rs.Status == skv.ReplyOK {
+		if rs := db.ObjectDocGet(fold, dbutil.BytesToHexString(sls[i])); rs.Status == skv.ReplyOK {
 			rpl.Data = append(rpl.Data, sls[i], rs.Bytes())
 		}
 	}

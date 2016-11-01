@@ -1,4 +1,4 @@
-// Copyright 2015 lessOS.com, All rights reserved.
+// Copyright 2015-2016 lessdb Author, All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,7 +15,9 @@
 package skv
 
 import (
-	"strconv"
+	"errors"
+
+	"github.com/lessos/lessdb/dbtypes"
 )
 
 const (
@@ -26,11 +28,7 @@ const (
 
 type Reply struct {
 	Status string
-	Data   [][]byte
-}
-
-type Entry struct {
-	Key, Value []byte
+	Data   []dbtypes.Bytex
 }
 
 func NewReply(status string) *Reply {
@@ -44,104 +42,115 @@ func NewReply(status string) *Reply {
 	}
 }
 
-func (r *Reply) Bytes() []byte {
+func (r *Reply) bytex() *dbtypes.Bytex {
 
 	if len(r.Data) > 0 {
-		return r.Data[0]
+		return &r.Data[0]
 	}
 
-	return []byte{}
+	return &dbtypes.Bytex{}
+}
+
+func (r *Reply) Bytes() []byte {
+	return r.bytex().Bytes()
 }
 
 func (r *Reply) String() string {
-	return string(r.Bytes())
-}
-
-func (r *Reply) Int64() int64 {
-
-	if i64, err := strconv.ParseInt(r.String(), 10, 64); err == nil {
-		return i64
-	}
-
-	return 0
+	return r.bytex().String()
 }
 
 func (r *Reply) Int() int {
-	return int(r.Int64())
-}
-
-func (r *Reply) Int32() int32 {
-	return int32(r.Int64())
-}
-
-func (r *Reply) Int16() int16 {
-	return int16(r.Int64())
+	return r.bytex().Int()
 }
 
 func (r *Reply) Int8() int8 {
-	return int8(r.Int64())
+	return r.bytex().Int8()
 }
 
-func (r *Reply) Uint64() uint64 {
+func (r *Reply) Int16() int16 {
+	return r.bytex().Int16()
+}
 
-	if ui64, err := strconv.ParseUint(r.String(), 10, 64); err == nil {
-		return ui64
-	}
+func (r *Reply) Int32() int32 {
+	return r.bytex().Int32()
+}
 
-	return 0
+func (r *Reply) Int64() int64 {
+	return r.bytex().Int64()
 }
 
 func (r *Reply) Uint() uint {
-	return uint(r.Uint64())
-}
-
-func (r *Reply) Uint32() uint32 {
-	return uint32(r.Uint64())
-}
-
-func (r *Reply) Uint16() uint16 {
-	return uint16(r.Uint64())
+	return r.bytex().Uint()
 }
 
 func (r *Reply) Uint8() uint8 {
-	return uint8(r.Uint64())
+	return r.bytex().Uint8()
+}
+
+func (r *Reply) Uint16() uint16 {
+	return r.bytex().Uint16()
+}
+
+func (r *Reply) Uint32() uint32 {
+	return r.bytex().Uint32()
+}
+
+func (r *Reply) Uint64() uint64 {
+	return r.bytex().Uint64()
+}
+
+func (r *Reply) Float32() float32 {
+	return r.bytex().Float32()
 }
 
 func (r *Reply) Float64() float64 {
-
-	if f64, err := strconv.ParseFloat(r.String(), 64); err == nil {
-		return f64
-	}
-
-	return 0
+	return r.bytex().Float64()
 }
 
 func (r *Reply) Bool() bool {
-
-	if b, err := strconv.ParseBool(r.String()); err == nil {
-		return b
-	}
-
-	return false
+	return r.bytex().Bool()
 }
 
-func (r *Reply) List() [][]byte {
+func (r *Reply) List() []dbtypes.Bytex {
 	return r.Data
 }
 
-func (r *Reply) Hash() []Entry {
+func (r *Reply) Hash() []ReplyEntry {
 
-	ls := []Entry{}
+	ls := []ReplyEntry{}
 
 	for i := 0; i < (len(r.Data) - 1); i += 2 {
-		ls = append(ls, Entry{r.Data[i], r.Data[i+1]})
+		ls = append(ls, ReplyEntry{r.Data[i], r.Data[i+1]})
 	}
 
 	return ls
 }
 
+func (r *Reply) KvLen() int {
+	return len(r.Data) / 2
+}
+
+func (r *Reply) KvEach(fn func(key, value dbtypes.Bytex)) int {
+
+	if len(r.Data) < 2 {
+		return 0
+	}
+
+	for i := 0; i < (len(r.Data) - 1); i += 2 {
+		fn(r.Data[i], r.Data[i+1])
+	}
+
+	return r.KvLen()
+}
+
+// Json returns the map that marshals from the reply bytes as json in response .
 func (r *Reply) JsonDecode(v interface{}) error {
-	return JsonDecode(r.Bytes(), v)
+
+	if len(r.Data) < 1 {
+		return errors.New("json: invalid format")
+	}
+
+	return r.Data[0].JsonDecode(&v)
 }
 
 func (r *Reply) Object() *Object {
@@ -152,7 +161,7 @@ func (r *Reply) Object() *Object {
 	}
 
 	if o.Meta.seek > 0 {
-		o.entryValue = r.Bytes()[o.Meta.seek:]
+		o.Data = r.Bytes()[o.Meta.seek:]
 	}
 
 	return o
@@ -170,7 +179,7 @@ func (r *Reply) ObjectList() []*Object {
 		}
 
 		if o.Meta.seek > 0 {
-			o.entryValue = r.Data[i+1][o.Meta.seek:]
+			o.Data = r.Data[i+1][o.Meta.seek:]
 		}
 
 		ls = append(ls, o)
@@ -194,102 +203,18 @@ func (r *Reply) ObjectMetaList() []ObjectMeta {
 	return ls
 }
 
-func (e *Entry) String() string {
-	return string(e.Value)
+type ReplyEntry struct {
+	Key, Value dbtypes.Bytex
 }
 
-func (e *Entry) Uint64() uint64 {
-
-	if ui64, err := strconv.ParseUint(e.String(), 10, 64); err == nil {
-		return ui64
-	}
-
-	return 0
+func (e *ReplyEntry) String() string {
+	return e.Value.String()
 }
 
-func (e *Entry) JsonDecode(v interface{}) error {
-	return JsonDecode(e.Value, v)
+func (e *ReplyEntry) Uint64() uint64 {
+	return e.Value.Uint64()
 }
 
-//
-type entryValue []byte
-
-func (v entryValue) Bytes() []byte {
-	return v
-}
-
-func (v entryValue) String() string {
-	return string(v.Bytes())
-}
-
-func (v entryValue) Int64() int64 {
-
-	if i64, err := strconv.ParseInt(v.String(), 10, 64); err == nil {
-		return i64
-	}
-
-	return 0
-}
-
-func (v entryValue) Int32() int32 {
-	return int32(v.Int64())
-}
-
-func (v entryValue) Int16() int16 {
-	return int16(v.Int64())
-}
-
-func (v entryValue) Int8() int8 {
-	return int8(v.Int64())
-}
-
-func (v entryValue) Int() int {
-	return int(v.Int64())
-}
-
-func (v entryValue) Uint64() uint64 {
-
-	if ui64, err := strconv.ParseUint(v.String(), 10, 64); err == nil {
-		return ui64
-	}
-
-	return 0
-}
-
-func (v entryValue) Uint32() uint32 {
-	return uint32(v.Uint64())
-}
-
-func (v entryValue) Uint16() uint16 {
-	return uint16(v.Uint64())
-}
-
-func (v entryValue) Uint8() uint8 {
-	return uint8(v.Uint64())
-}
-
-func (v entryValue) Uint() uint {
-	return uint(v.Uint64())
-}
-
-func (v entryValue) Float64() float64 {
-
-	if f64, err := strconv.ParseFloat(v.String(), 64); err == nil {
-		return f64
-	}
-
-	return 0
-}
-
-func (v entryValue) Bool() bool {
-
-	if b, err := strconv.ParseBool(v.String()); err == nil {
-		return b
-	}
-
-	return false
-}
-
-func (v entryValue) JsonDecode(vi interface{}) error {
-	return JsonDecode(v, vi)
+func (e *ReplyEntry) JsonDecode(v interface{}) error {
+	return e.Value.JsonDecode(&v)
 }

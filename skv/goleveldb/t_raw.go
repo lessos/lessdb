@@ -1,4 +1,4 @@
-// Copyright 2015 lessOS.com, All rights reserved.
+// Copyright 2015-2016 lessdb Author, All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,6 +20,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/lessos/lessdb/dbtypes"
+	"github.com/lessos/lessdb/dbutil"
 	"github.com/lessos/lessdb/skv"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
@@ -42,7 +44,7 @@ func (db *DB) RawGet(key []byte) *skv.Reply {
 		}
 
 	} else {
-		rpl.Data = [][]byte{data}
+		rpl.Data = []dbtypes.Bytex{data}
 	}
 
 	return rpl
@@ -65,7 +67,7 @@ func (db *DB) RawPut(key, value []byte, ttl int64) *skv.Reply {
 
 		switch key[0] {
 		case skv.NsKvEntry:
-			if ok := db._raw_ssttlat_put(key[0], key[1:], skv.MetaTimeNowAddMS(ttl)); !ok {
+			if ok := db._raw_ssttlat_put(key[0], key[1:], dbutil.MetaTimeNowAddMS(ttl)); !ok {
 				rpl.Status = skv.ReplyBadArgument
 				return rpl
 			}
@@ -84,7 +86,7 @@ func (db *DB) RawPut(key, value []byte, ttl int64) *skv.Reply {
 
 func (db *DB) _raw_put_json(key []byte, value interface{}, ttl int64) *skv.Reply {
 
-	bvalue, err := skv.JsonEncode(value)
+	bvalue, err := dbutil.JsonEncode(value)
 	if err != nil {
 		return skv.NewReply(err.Error())
 	}
@@ -133,8 +135,8 @@ func (db *DB) RawScan(cursor, end []byte, limit uint32) *skv.Reply {
 			break
 		}
 
-		rpl.Data = append(rpl.Data, skv.BytesClone(iter.Key()))
-		rpl.Data = append(rpl.Data, skv.BytesClone(iter.Value()))
+		rpl.Data = append(rpl.Data, dbutil.BytesClone(iter.Key()))
+		rpl.Data = append(rpl.Data, dbutil.BytesClone(iter.Value()))
 
 		limit--
 	}
@@ -176,8 +178,8 @@ func (db *DB) RawRevScan(cursor, end []byte, limit uint32) *skv.Reply {
 			break
 		}
 
-		rpl.Data = append(rpl.Data, skv.BytesClone(iter.Key()))
-		rpl.Data = append(rpl.Data, skv.BytesClone(iter.Value()))
+		rpl.Data = append(rpl.Data, dbutil.BytesClone(iter.Key()))
+		rpl.Data = append(rpl.Data, dbutil.BytesClone(iter.Value()))
 
 		limit--
 	}
@@ -191,7 +193,7 @@ func (db *DB) RawRevScan(cursor, end []byte, limit uint32) *skv.Reply {
 	return rpl
 }
 
-func (db *DB) _raw_incrby(key []byte, step int64) *skv.Reply {
+func (db *DB) RawIncrby(key []byte, step int64) *skv.Reply {
 
 	if step == 0 {
 		return skv.NewReply("")
@@ -240,8 +242,8 @@ func (db *DB) _raw_ssttl_get(ns byte, key []byte) *skv.Reply {
 
 	rpl, ttl := skv.NewReply(""), int64(0)
 
-	if ttlat := skv.BytesToUint64(db.RawGet(skv.RawTtlEntry(key)).Bytes()); ttlat > 0 {
-		ttl = (skv.MetaTimeParse(ttlat).UnixNano() - time.Now().UTC().UnixNano()) / 1e6
+	if ttlat := dbutil.BytesToUint64(db.RawGet(skv.RawTtlEntry(key)).Bytes()); ttlat > 0 {
+		ttl = (dbutil.MetaTimeParse(ttlat).UnixNano() - time.Now().UTC().UnixNano()) / 1e6
 	}
 
 	if ttl < 0 {
@@ -265,7 +267,7 @@ func (db *DB) _raw_ssttlat_put(ns byte, key []byte, ttlat uint64) bool {
 
 	//
 	if prev := db.RawGet(skv.RawTtlEntry(key)); prev.Status == skv.ReplyOK {
-		if prev_ttlat := skv.BytesToUint64(prev.Bytes()); prev_ttlat != ttlat {
+		if prev_ttlat := dbutil.BytesToUint64(prev.Bytes()); prev_ttlat != ttlat {
 			batch.Delete(skv.RawTtlQueue(key, prev_ttlat))
 		}
 	}
@@ -274,7 +276,7 @@ func (db *DB) _raw_ssttlat_put(ns byte, key []byte, ttlat uint64) bool {
 	batch.Put(skv.RawTtlQueue(key, ttlat), []byte{})
 
 	//
-	batch.Put(skv.RawTtlEntry(key), skv.Uint64ToBytes(ttlat))
+	batch.Put(skv.RawTtlEntry(key), dbutil.Uint64ToBytes(ttlat))
 
 	if err := db.ldb.Write(batch, nil); err != nil {
 		return false
@@ -310,7 +312,7 @@ func (db *DB) _raw_ssttlat_range(score_start, score_end, limit uint64) *skv.Repl
 
 		ui64 := binary.BigEndian.Uint64(iter.Key()[1:9])
 
-		rpl.Data = append(rpl.Data, skv.BytesClone(iter.Key()))
+		rpl.Data = append(rpl.Data, dbutil.BytesClone(iter.Key()))
 		rpl.Data = append(rpl.Data, []byte(strconv.FormatUint(ui64, 10)))
 
 		limit--

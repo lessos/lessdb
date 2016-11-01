@@ -1,4 +1,4 @@
-// Copyright 2015 lessOS.com, All rights reserved.
+// Copyright 2015-2016 lessdb Author, All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package goleveldb
 import (
 	"time"
 
+	"github.com/lessos/lessdb/dbutil"
 	"github.com/lessos/lessdb/skv"
 	"github.com/syndtr/goleveldb/leveldb"
 )
@@ -32,13 +33,13 @@ func (db *DB) ttl_worker() {
 
 		for {
 
-			ls := db._raw_ssttlat_range(0, skv.MetaTimeNow(), _ttl_worker_limit).Hash()
+			ls := db._raw_ssttlat_range(0, dbutil.MetaTimeNow(), _ttl_worker_limit).Hash()
 
 			for _, v := range ls {
 
 				batch := new(leveldb.Batch)
 
-				if skv.BytesToUint64(db.RawGet(skv.RawTtlEntry(v.Key[9:])).Bytes()) == v.Uint64() {
+				if dbutil.BytesToUint64(db.RawGet(skv.RawTtlEntry(v.Key[9:])).Bytes()) == v.Uint64() {
 
 					batch.Delete(skv.RawTtlEntry(v.Key[9:]))
 

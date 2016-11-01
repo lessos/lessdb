@@ -1,4 +1,4 @@
-// Copyright 2015 lessOS.com, All rights reserved.
+// Copyright 2015-2016 lessdb Author, All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 package goleveldb
 
 import (
+	"github.com/lessos/lessdb/dbutil"
 	"github.com/lessos/lessdb/skv"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
@@ -28,7 +29,7 @@ func (db *DB) HashPut(key, field, value []byte, ttl int64) *skv.Reply {
 	bkey := skv.HashNsEntryKey(key, field)
 
 	if rs := db.RawGet(bkey); rs.Status == skv.ReplyNotFound {
-		db._raw_incrby(skv.HashNsLengthKey(key), 1)
+		db.RawIncrby(skv.HashNsLengthKey(key), 1)
 	}
 
 	return db.RawPut(bkey, value, 0)
@@ -39,7 +40,7 @@ func (db *DB) HashPutJson(key, field []byte, value interface{}, ttl int64) *skv.
 	bkey := skv.HashNsEntryKey(key, field)
 
 	if rs := db.RawGet(bkey); rs.Status == skv.ReplyNotFound {
-		db._raw_incrby(skv.HashNsLengthKey(key), 1)
+		db.RawIncrby(skv.HashNsLengthKey(key), 1)
 	}
 
 	return db._raw_put_json(bkey, value, 0)
@@ -50,7 +51,7 @@ func (db *DB) HashDel(key, field []byte) *skv.Reply {
 	bkey := skv.HashNsEntryKey(key, field)
 
 	if rs := db.RawGet(bkey); rs.Status == skv.ReplyOK {
-		db._raw_incrby(skv.HashNsLengthKey(key), -1)
+		db.RawIncrby(skv.HashNsLengthKey(key), -1)
 		return db.RawDel(bkey)
 	}
 
@@ -87,8 +88,8 @@ func (db *DB) HashScan(key, cursor, end []byte, limit uint32) *skv.Reply {
 			continue
 		}
 
-		rpl.Data = append(rpl.Data, skv.BytesClone(iter.Key()[prelen:]))
-		rpl.Data = append(rpl.Data, skv.BytesClone(iter.Value()))
+		rpl.Data = append(rpl.Data, dbutil.BytesClone(iter.Key()[prelen:]))
+		rpl.Data = append(rpl.Data, dbutil.BytesClone(iter.Value()))
 
 		limit--
 	}

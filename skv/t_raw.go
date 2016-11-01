@@ -1,4 +1,4 @@
-// Copyright 2015 lessOS.com, All rights reserved.
+// Copyright 2015-2016 lessdb Author, All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,15 +14,28 @@
 
 package skv
 
+import (
+	"github.com/lessos/lessdb/dbutil"
+)
+
+type RawInterface interface {
+	RawGet(key []byte) *Reply
+	RawPut(key, value []byte, ttl int64) *Reply
+	RawDel(key []byte, value interface{}, ttl int64) *Reply
+	RawScan(keys ...[]byte) *Reply
+	RawRevScan(cursor, end []byte, limit uint32) *Reply
+	RawIncrby(key []byte, step int64) *Reply
+}
+
 func RawNsKeyConcat(ns byte, key []byte) []byte {
-	return append([]byte{ns}, KeyLenFilter(key)...)
+	return append([]byte{ns}, keyLenFilter(key)...)
 }
 
 func RawNsKeyEncode(ns byte, key []byte) []byte {
 
-	k2 := KeyLenFilter(key)
+	k := keyLenFilter(key)
 
-	return append([]byte{ns, uint8(len(k2))}, k2...)
+	return append([]byte{ns, uint8(len(k))}, k...)
 }
 
 func RawTtlEntry(key []byte) []byte {
@@ -30,7 +43,7 @@ func RawTtlEntry(key []byte) []byte {
 }
 
 func RawTtlQueuePrefix(ttlat uint64) []byte {
-	return RawNsKeyConcat(NsRawTtlQueue, Uint64ToBytes(ttlat))
+	return RawNsKeyConcat(NsRawTtlQueue, dbutil.Uint64ToBytes(ttlat))
 }
 
 func RawTtlQueue(key []byte, ttlat uint64) []byte {

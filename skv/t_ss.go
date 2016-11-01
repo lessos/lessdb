@@ -1,4 +1,4 @@
-// Copyright 2015 lessOS.com, All rights reserved.
+// Copyright 2015-2016 lessdb Author, All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,6 +13,10 @@
 // limitations under the License.
 
 package skv
+
+import (
+	"github.com/lessos/lessdb/dbutil"
+)
 
 type SsInterface interface {
 	SsGet(key, member []byte) *Reply
@@ -31,7 +35,7 @@ func SortSetsNsLengthKey(key []byte) []byte {
 }
 
 func SortSetsNsScorePrefix(key []byte, score uint64) []byte {
-	return append(RawNsKeyEncode(nsSsScore, key), Uint64ToBytes(score)...)
+	return append(RawNsKeyEncode(nsSsScore, key), dbutil.Uint64ToBytes(score)...)
 }
 
 func SortSetsNsScoreKey(key, member []byte, score uint64) []byte {

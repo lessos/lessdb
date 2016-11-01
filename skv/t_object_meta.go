@@ -1,4 +1,4 @@
-// Copyright 2015 lessOS.com, All rights reserved.
+// Copyright 2015-2016 lessdb Author, All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@ package skv
 import (
 	"encoding/binary"
 	"time"
+
+	"github.com/lessos/lessdb/dbutil"
 )
 
 const (
@@ -83,7 +85,7 @@ func (m *ObjectMeta) Export() []byte {
 
 	//
 	if m.Expired == 0 && m.Ttl > 0 {
-		m.Expired = MetaTimeNowAddMS(m.Ttl)
+		m.Expired = dbutil.MetaTimeNowAddMS(m.Ttl)
 	}
 
 	binary.BigEndian.PutUint64(data[20:28], m.Created)
@@ -161,7 +163,7 @@ func ObjectMetaParse(data []byte) ObjectMeta {
 
 		//
 		if m.Expired > 0 {
-			m.Ttl = (MetaTimeParse(m.Expired).UnixNano() - time.Now().UTC().UnixNano()) / 1e6
+			m.Ttl = (dbutil.MetaTimeParse(m.Expired).UnixNano() - time.Now().UTC().UnixNano()) / 1e6
 		}
 
 		//

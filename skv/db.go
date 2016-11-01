@@ -1,4 +1,4 @@
-// Copyright 2015 lessOS.com, All rights reserved.
+// Copyright 2015-2016 lessdb Author, All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,8 +21,8 @@ const (
 	GiB = MiB * 1024
 
 	//
-	KeyLenMax    int    = 200
-	ScanLimitMax uint32 = 10000
+	keyLenMax    int    = 200
+	ScanLimitMax uint32 = 100000
 
 	// Namespace
 	NsRawTtlEntry          = 0x08
@@ -46,7 +46,7 @@ const (
 
 type DB interface {
 	KvInterface        // Key Value
-	HashInterface      // Hashs
+	HashInterface      // Hashed Sets
 	SsInterface        // Sorted Sets
 	ObjectInterface    // Objects
 	ObjectDocInterface // Indexed Documents

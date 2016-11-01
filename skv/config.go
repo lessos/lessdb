@@ -1,4 +1,4 @@
-// Copyright 2015 lessOS.com, All rights reserved.
+// Copyright 2015-2016 lessdb Author, All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,19 +17,17 @@ package skv
 type Config struct {
 	Driver                 string `json:"driver,omitempty"`
 	DataDir                string `json:"datadir,omitempty"`
-	DataDirGroup           string
-	WriteBuffer            int `json:"write_buffer,omitempty"`
-	BlockCacheCapacity     int `json:"block_cache_capacity,omitempty"`
-	CacheCapacity          int `json:"cache_capacity,omitempty"`
-	OpenFilesCacheCapacity int `json:"open_files_cache_capacity,omitempty"`
-	CompactionTableSize    int `json:"compaction_table_size,omitempty"`
+	WriteBuffer            int    `json:"write_buffer,omitempty"`
+	BlockCacheCapacity     int    `json:"block_cache_capacity,omitempty"`
+	CacheCapacity          int    `json:"cache_capacity,omitempty"`
+	OpenFilesCacheCapacity int    `json:"open_files_cache_capacity,omitempty"`
+	CompactionTableSize    int    `json:"compaction_table_size,omitempty"`
 }
 
 var (
 	DefaultConfig = Config{
 		Driver:                 "goleveldb",
 		DataDir:                "./var",
-		DataDirGroup:           "/0.0",
 		WriteBuffer:            4,   // 4 MiB
 		CacheCapacity:          8,   // 8 MiB
 		OpenFilesCacheCapacity: 500, // 500

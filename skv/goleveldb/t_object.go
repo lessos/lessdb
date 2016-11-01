@@ -1,4 +1,4 @@
-// Copyright 2015 lessOS.com, All rights reserved.
+// Copyright 2015-2016 lessdb Author, All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import (
 	"hash/crc32"
 	"sync"
 
+	"github.com/lessos/lessdb/dbutil"
 	"github.com/lessos/lessdb/skv"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
@@ -62,7 +63,7 @@ func (db *DB) ObjectPut(path string, value interface{}, opts *skv.ObjectWriteOpt
 		bvalue = value.([]byte)
 
 	case map[string]interface{}, struct{}:
-		bvalue, _ = skv.JsonEncode(value)
+		bvalue, _ = dbutil.JsonEncode(value)
 
 	case string:
 		bvalue = []byte(value.(string))
@@ -82,7 +83,7 @@ func (db *DB) ObjectPut(path string, value interface{}, opts *skv.ObjectWriteOpt
 	}
 
 	if opts.Expired == 0 && opts.Ttl > 0 {
-		opts.Expired = skv.MetaTimeNowAddMS(opts.Ttl)
+		opts.Expired = dbutil.MetaTimeNowAddMS(opts.Ttl)
 	}
 
 	meta := db.RawGet(mkey).ObjectMeta()
@@ -131,8 +132,8 @@ func (db *DB) ObjectScan(fold, cursor, end string, limit uint32) *skv.Reply {
 	var (
 		prefix = skv.ObjectNsEntryFoldKey(fold)
 		prelen = len(prefix)
-		cstart = append(prefix, skv.HexStringToBytes(cursor)...)
-		cend   = append(prefix, skv.HexStringToBytes(end)...)
+		cstart = append(prefix, dbutil.HexStringToBytes(cursor)...)
+		cend   = append(prefix, dbutil.HexStringToBytes(end)...)
 		rpl    = skv.NewReply("")
 	)
 
@@ -160,8 +161,8 @@ func (db *DB) ObjectScan(fold, cursor, end string, limit uint32) *skv.Reply {
 			continue
 		}
 
-		rpl.Data = append(rpl.Data, skv.BytesClone(iter.Key()[prelen:]))
-		rpl.Data = append(rpl.Data, skv.BytesClone(iter.Value()))
+		rpl.Data = append(rpl.Data, dbutil.BytesClone(iter.Key()[prelen:]))
+		rpl.Data = append(rpl.Data, dbutil.BytesClone(iter.Value()))
 
 		limit--
 	}
@@ -183,8 +184,8 @@ type _object_journal struct {
 func (db *DB) ObjectLogScan(bucket string, pg_num uint32, start, end uint64, limit uint32) *skv.ObjectLogReply {
 
 	var (
-		prefix = skv.BytesConcat([]byte{skv.NsObjectLogEntry}, skv.NewObjectPathParse(bucket+"/0").BucketBytes(), skv.Uint32ToBytes(pg_num))
-		cstart = append(prefix, skv.Uint64ToBytes(start)...)
+		prefix = dbutil.BytesConcat([]byte{skv.NsObjectLogEntry}, skv.NewObjectPathParse(bucket+"/0").BucketBytes(), dbutil.Uint32ToBytes(pg_num))
+		cstart = append(prefix, dbutil.Uint64ToBytes(start)...)
 		cend   = prefix
 		rpl    = &skv.ObjectLogReply{}
 	)
@@ -195,7 +196,7 @@ func (db *DB) ObjectLogScan(bucket string, pg_num uint32, start, end uint64, lim
 	if end <= start {
 		cend = append(prefix, []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}...)
 	} else {
-		cend = append(prefix, skv.Uint64ToBytes(end)...)
+		cend = append(prefix, dbutil.Uint64ToBytes(end)...)
 	}
 
 	if limit > uint32(skv.ScanLimitMax) {
@@ -218,8 +219,8 @@ func (db *DB) ObjectLogScan(bucket string, pg_num uint32, start, end uint64, lim
 		}
 
 		keys = append(keys, _object_journal{
-			path:    skv.BytesClone(iter.Value()),
-			version: skv.BytesToUint64(iter.Key()[len(iter.Key())-8:]),
+			path:    dbutil.BytesClone(iter.Value()),
+			version: dbutil.BytesToUint64(iter.Key()[len(iter.Key())-8:]),
 		})
 
 		limit--
@@ -254,7 +255,7 @@ func (db *DB) ObjectLogScan(bucket string, pg_num uint32, start, end uint64, lim
 				rpl.Data = append(rpl.Data, key.path)
 				rpl.Data = append(rpl.Data, r.Bytes())
 			} else {
-				db.RawDel(append(prefix, skv.Uint64ToBytes(key.version)...))
+				db.RawDel(append(prefix, dbutil.Uint64ToBytes(key.version)...))
 			}
 		}
 	}
@@ -271,8 +272,8 @@ func (db *DB) ObjectMetaScan(fold, cursor, end string, limit uint32) *skv.Reply 
 	var (
 		prefix = skv.ObjectNsMetaFoldKey(fold)
 		prelen = len(prefix)
-		cstart = append(prefix, skv.HexStringToBytes(cursor)...)
-		cend   = append(prefix, skv.HexStringToBytes(end)...)
+		cstart = append(prefix, dbutil.HexStringToBytes(cursor)...)
+		cend   = append(prefix, dbutil.HexStringToBytes(end)...)
 		rpl    = skv.NewReply("")
 	)
 
@@ -296,8 +297,8 @@ func (db *DB) ObjectMetaScan(fold, cursor, end string, limit uint32) *skv.Reply 
 			continue
 		}
 
-		rpl.Data = append(rpl.Data, skv.BytesClone(iter.Key()[prelen:]))
-		rpl.Data = append(rpl.Data, skv.BytesClone(iter.Value()))
+		rpl.Data = append(rpl.Data, dbutil.BytesClone(iter.Key()[prelen:]))
+		rpl.Data = append(rpl.Data, dbutil.BytesClone(iter.Value()))
 
 		limit--
 	}
@@ -312,7 +313,7 @@ func (db *DB) ObjectMetaScan(fold, cursor, end string, limit uint32) *skv.Reply 
 }
 
 func (db *DB) ObjectMetaVersionIncr(path string, group_number uint32, step int64) *skv.Reply {
-	return db._raw_incrby(skv.NewObjectPathParse(path).NsVersionCounterIndex(group_number), step)
+	return db.RawIncrby(skv.NewObjectPathParse(path).NsVersionCounterIndex(group_number), step)
 }
 
 func (db *DB) ObjectGroupStatus(bucket string, group_number uint32) *skv.Reply {
@@ -334,7 +335,7 @@ func (db *DB) _obj_group_status_sync(bucket_bytes []byte, group_number uint32, e
 	defer _obj_grpstatus_locker.Unlock()
 
 	var (
-		key = skv.BytesConcat([]byte{skv.NsObjectGroupStatus}, bucket_bytes, skv.Uint32ToBytes(group_number))
+		key = dbutil.BytesConcat([]byte{skv.NsObjectGroupStatus}, bucket_bytes, dbutil.Uint32ToBytes(group_number))
 		st  skv.ObjectGroupStatus
 	)
 
@@ -386,13 +387,13 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 
 		//
 		if meta.Created < 1 {
-			meta.Created = skv.MetaTimeNow()
+			meta.Created = dbutil.MetaTimeNow()
 		}
 
 		if opts.Updated > 0 {
 			meta.Updated = opts.Updated
 		} else {
-			meta.Updated = skv.MetaTimeNow()
+			meta.Updated = dbutil.MetaTimeNow()
 		}
 
 		meta.Num = 0
@@ -421,7 +422,7 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 
 	// fmt.Printf("opts.LogEnable PUT %s/%s, EN:%v, TTL:%d, VER:%d\n", opath.FoldName, opath.FieldName, opts.LogEnable, opts.Ttl, meta.Version)
 	if opts.LogEnable && meta.Version == 0 {
-		meta.Version = db._raw_incrby(opath.NsVersionCounterIndex(opts.GroupNumber), 1).Uint64()
+		meta.Version = db.RawIncrby(opath.NsVersionCounterIndex(opts.GroupNumber), 1).Uint64()
 		// fmt.Println("opts.LogEnable Version NEW", meta.Version)
 	}
 
@@ -457,9 +458,9 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 			}
 
 			if pfp_meta.Created < 1 {
-				pfp_meta.Created = skv.MetaTimeNow()
+				pfp_meta.Created = dbutil.MetaTimeNow()
 			}
-			pfp_meta.Updated = skv.MetaTimeNow()
+			pfp_meta.Updated = dbutil.MetaTimeNow()
 
 			//
 			found := false
@@ -537,9 +538,9 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 
 	//
 	if fold_meta.Created < 1 {
-		fold_meta.Created = skv.MetaTimeNow()
+		fold_meta.Created = dbutil.MetaTimeNow()
 	}
-	fold_meta.Updated = skv.MetaTimeNow()
+	fold_meta.Updated = dbutil.MetaTimeNow()
 
 	//
 	batch := new(leveldb.Batch)
@@ -559,7 +560,7 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 				batch.Delete(opath.NsLogEntryIndex(opts.GroupNumber, meta.LogVersion))
 			}
 
-			meta.LogVersion = db._raw_incrby(opath.NsLogCounterIndex(opts.GroupNumber), 1).Uint64()
+			meta.LogVersion = db.RawIncrby(opath.NsLogCounterIndex(opts.GroupNumber), 1).Uint64()
 
 			batch.Put(opath.NsLogEntryIndex(opts.GroupNumber, meta.LogVersion), []byte(opath.EntryPath()))
 		}
@@ -589,7 +590,7 @@ func (db *DB) _obj_meta_sync(otype byte, meta *skv.ObjectMeta, opath *skv.Object
 		batch.Put(fold_path.MetaIndex(), fold_meta.Export())
 		batch.Put(fold_path.EntryIndex(), fold_meta.Export())
 
-		// fmt.Println("\t#### fs dir add", fold_path.EntryPath(), fold_meta.Num, opath.EntryPath(), meta.Version, skv.MetaTimeNow())
+		// fmt.Println("\t#### fs dir add", fold_path.EntryPath(), fold_meta.Num, opath.EntryPath(), meta.Version, dbutil.MetaTimeNow())
 	}
 
 	//

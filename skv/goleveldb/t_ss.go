@@ -1,4 +1,4 @@
-// Copyright 2015 lessOS.com, All rights reserved.
+// Copyright 2015-2016 lessdb Author, All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ import (
 	"encoding/binary"
 	"strconv"
 
+	"github.com/lessos/lessdb/dbutil"
 	"github.com/lessos/lessdb/skv"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
@@ -37,7 +38,7 @@ func (db *DB) SsPut(key, member []byte, score uint64) *skv.Reply {
 		batch.Delete(skv.SortSetsNsScoreKey(key, member, prev.Uint64()))
 
 	} else if prev.Status == skv.ReplyNotFound {
-		db._raw_incrby(skv.SortSetsNsLengthKey(key), 1)
+		db.RawIncrby(skv.SortSetsNsLengthKey(key), 1)
 	}
 
 	//
@@ -82,8 +83,8 @@ func (db *DB) SsRange(key []byte, score_start, score_end uint64, limit uint32) *
 
 		ui64 := binary.BigEndian.Uint64(iter.Key()[len(key)+2 : (len(key) + 10)])
 
-		rpl.Data = append(rpl.Data, skv.BytesClone(iter.Key()[(len(key)+10):]))
-		rpl.Data = append(rpl.Data, skv.BytesClone([]byte(strconv.FormatUint(ui64, 10))))
+		rpl.Data = append(rpl.Data, dbutil.BytesClone(iter.Key()[(len(key)+10):]))
+		rpl.Data = append(rpl.Data, dbutil.BytesClone([]byte(strconv.FormatUint(ui64, 10))))
 
 		limit--
 	}
@@ -104,7 +105,7 @@ func (db *DB) SsDel(key, member []byte) *skv.Reply {
 	batch.Delete(skv.SortSetsNsEntryKey(key, member))
 
 	if prev := db.SsGet(key, member); prev.Status == skv.ReplyOK {
-		db._raw_incrby(skv.SortSetsNsLengthKey(key), -1)
+		db.RawIncrby(skv.SortSetsNsLengthKey(key), -1)
 		batch.Delete(skv.SortSetsNsScoreKey(key, member, prev.Uint64()))
 	}
 

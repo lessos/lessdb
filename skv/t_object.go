@@ -1,4 +1,4 @@
-// Copyright 2015 lessOS.com, All rights reserved.
+// Copyright 2015-2016 lessdb Author, All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,6 +16,9 @@ package skv
 
 import (
 	"strings"
+
+	"github.com/lessos/lessdb/dbtypes"
+	"github.com/lessos/lessdb/dbutil"
 )
 
 const (
@@ -94,7 +97,7 @@ func (op *ObjectPath) MetaIndex() []byte {
 }
 
 func (op *ObjectPath) EntryPath() string {
-	return ObjectPathClean(op.FoldName + "/" + op.FieldName)
+	return dbutil.ObjectPathClean(op.FoldName + "/" + op.FieldName)
 }
 
 func (op *ObjectPath) Parent() *ObjectPath {
@@ -112,44 +115,44 @@ func (op *ObjectPath) BucketName() string {
 }
 
 func (op *ObjectPath) BucketBytes() []byte {
-	return _string_to_hash_bytes(op.BucketName(), 4) // 2^32
+	return stringToHashBytes(op.BucketName(), 4) // 2^32
 }
 
 func (op *ObjectPath) BucketID() uint32 {
-	return BytesToUint32(op.BucketBytes())
+	return dbutil.BytesToUint32(op.BucketBytes())
 }
 
 func (op *ObjectPath) NsVersionCounterIndex(group_number uint32) []byte {
-	return BytesConcat([]byte{NsObjectVersionCounter}, op.BucketBytes(), Uint32ToBytes(group_number))
+	return dbutil.BytesConcat([]byte{NsObjectVersionCounter}, op.BucketBytes(), dbutil.Uint32ToBytes(group_number))
 }
 
 func (op *ObjectPath) NsLogCounterIndex(group_number uint32) []byte {
-	return BytesConcat([]byte{NsObjectLogCounter}, op.BucketBytes(), Uint32ToBytes(group_number))
+	return dbutil.BytesConcat([]byte{NsObjectLogCounter}, op.BucketBytes(), dbutil.Uint32ToBytes(group_number))
 }
 
 func (op *ObjectPath) NsLogEntryIndex(group_number uint32, num uint64) []byte {
-	return BytesConcat([]byte{NsObjectLogEntry}, op.BucketBytes(), Uint32ToBytes(group_number), Uint64ToBytes(num))
+	return dbutil.BytesConcat([]byte{NsObjectLogEntry}, op.BucketBytes(), dbutil.Uint32ToBytes(group_number), dbutil.Uint64ToBytes(num))
 }
 
 func (op *ObjectPath) NsGroupStatusIndex(group_number uint32) []byte {
-	return BytesConcat([]byte{NsObjectGroupStatus}, op.BucketBytes(), Uint32ToBytes(group_number))
+	return dbutil.BytesConcat([]byte{NsObjectGroupStatus}, op.BucketBytes(), dbutil.Uint32ToBytes(group_number))
 }
 
 //
 func NewObjectPathKey(fold, key string) *ObjectPath {
 
 	op := &ObjectPath{
-		FoldName: ObjectPathClean(fold),
+		FoldName: dbutil.ObjectPathClean(fold),
 	}
 
-	op.Fold = _string_to_hash_bytes(op.FoldName, ObjectFoldLength)
+	op.Fold = stringToHashBytes(op.FoldName, ObjectFoldLength)
 
 	klen := len(key)
 	if klen > 32 {
 		klen = 32
 	}
 
-	if v := HexStringToBytes(key[:klen]); len(v) > 0 {
+	if v := dbutil.HexStringToBytes(key[:klen]); len(v) > 0 {
 		op.Field = v
 		op.FieldName = key[:klen]
 	}
@@ -166,7 +169,7 @@ func NewObjectPathParse(path string) *ObjectPath {
 		is_fold = true
 	}
 
-	path = ObjectPathClean(path)
+	path = dbutil.ObjectPathClean(path)
 
 	if is_fold {
 		op.FoldName, op.FieldName = path, ""
@@ -178,22 +181,22 @@ func NewObjectPathParse(path string) *ObjectPath {
 		}
 	}
 
-	op.Fold = _string_to_hash_bytes(op.FoldName, ObjectFoldLength)
-	op.Field = _string_to_hash_bytes(op.FieldName, ObjectFieldLength)
+	op.Fold = stringToHashBytes(op.FoldName, ObjectFoldLength)
+	op.Field = stringToHashBytes(op.FieldName, ObjectFieldLength)
 
 	return op
 }
 
 func ObjectNsEntryFoldKey(path string) []byte {
-	return RawNsKeyConcat(NsObjectEntry, _string_to_hash_bytes(ObjectPathClean(path), ObjectFoldLength))
+	return RawNsKeyConcat(NsObjectEntry, stringToHashBytes(dbutil.ObjectPathClean(path), ObjectFoldLength))
 }
 
 func ObjectNsMetaFoldKey(path string) []byte {
-	return RawNsKeyConcat(NsObjectMeta, _string_to_hash_bytes(ObjectPathClean(path), ObjectFoldLength))
+	return RawNsKeyConcat(NsObjectMeta, stringToHashBytes(dbutil.ObjectPathClean(path), ObjectFoldLength))
 }
 
 type Object struct {
-	entryValue
+	Data   dbtypes.Bytex
 	Status string
 	Meta   ObjectMeta
 	Key    []byte

@@ -1,4 +1,4 @@
-// Copyright 2015 lessOS.com, All rights reserved.
+// Copyright 2015-2016 lessdb Author, All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@ package goleveldb
 
 import (
 	"github.com/lessos/lessdb/skv"
+	//"github.com/lessos/lessdb/dbutil"
 )
 
 func (db *DB) KvGet(key []byte) *skv.Reply {
@@ -53,7 +54,7 @@ func (db *DB) KvDel(keys ...[]byte) *skv.Reply {
 }
 
 func (db *DB) KvIncrby(key []byte, step int64) *skv.Reply {
-	return db._raw_incrby(skv.RawNsKeyConcat(skv.NsKvEntry, key), step)
+	return db.RawIncrby(skv.RawNsKeyConcat(skv.NsKvEntry, key), step)
 }
 
 func (db *DB) KvTtl(key []byte) *skv.Reply {

@@ -1,4 +1,4 @@
-// Copyright 2015 lessOS.com, All rights reserved.
+// Copyright 2015-2016 lessdb Author, All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,9 +36,9 @@ func Open(cfg skv.Config) (*DB, error) {
 
 	cfg.ReFix()
 
-	os.MkdirAll(cfg.DataDir+cfg.DataDirGroup, 0750)
+	os.MkdirAll(cfg.DataDir, 0750)
 
-	db.ldb, err = leveldb.OpenFile(cfg.DataDir+cfg.DataDirGroup, &opt.Options{
+	db.ldb, err = leveldb.OpenFile(cfg.DataDir, &opt.Options{
 		WriteBuffer:            cfg.WriteBuffer * opt.MiB,
 		BlockCacheCapacity:     cfg.BlockCacheCapacity * opt.MiB,
 		OpenFilesCacheCapacity: cfg.OpenFilesCacheCapacity,
@@ -49,7 +49,6 @@ func Open(cfg skv.Config) (*DB, error) {
 
 	if err == nil {
 		db.ttl_worker()
-		// fmt.Println("lessdb/skv.DB " + cfg.DataDir + " opened")
 	}
 
 	return db, err

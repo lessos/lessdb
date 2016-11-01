@@ -14,12 +14,30 @@
 
 package skv
 
-type KvInterface interface {
-	KvGet(key []byte) *Reply
-	KvPut(key, value []byte, ttl int64) *Reply
-	KvPutJson(key []byte, value interface{}, ttl int64) *Reply
-	KvDel(keys ...[]byte) *Reply
-	KvScan(cursor, end []byte, limit uint32) *Reply
-	KvIncrby(key []byte, step int64) *Reply
-	KvTtl(key []byte) *Reply
+import (
+	"crypto/sha1"
+	"io"
+)
+
+func stringToHashBytes(str string, num int) []byte {
+
+	if num < 1 {
+		num = 1
+	} else if num > 20 {
+		num = 20
+	}
+
+	h := sha1.New()
+	io.WriteString(h, str)
+
+	return h.Sum(nil)[:num]
+}
+
+func keyLenFilter(key []byte) []byte {
+
+	if len(key) < keyLenMax {
+		return key
+	}
+
+	return key[:keyLenMax]
 }
