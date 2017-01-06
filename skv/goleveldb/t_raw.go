@@ -238,11 +238,11 @@ func (db *DB) RawIncrby(key []byte, step int64) *skv.Reply {
 
 func (db *DB) _raw_ssttl_get(ns byte, key []byte) *skv.Reply {
 
-	key = skv.RawNsKeyConcat(ns, key)
+	ttl_key := skv.RawNsKeyConcat(ns, key)
 
 	rpl, ttl := skv.NewReply(""), int64(0)
 
-	if ttlat := dbutil.BytesToUint64(db.RawGet(skv.RawTtlEntry(key)).Bytes()); ttlat > 0 {
+	if ttlat := dbutil.BytesToUint64(db.RawGet(skv.RawTtlEntry(ttl_key)).Bytes()); ttlat > 0 {
 		ttl = (dbutil.MetaTimeParse(ttlat).UnixNano() - time.Now().UTC().UnixNano()) / 1e6
 	}
 
@@ -261,22 +261,22 @@ func (db *DB) _raw_ssttlat_put(ns byte, key []byte, ttlat uint64) bool {
 		return true
 	}
 
-	key = skv.RawNsKeyConcat(ns, key)
+	ttl_key := skv.RawNsKeyConcat(ns, key)
 
 	batch := new(leveldb.Batch)
 
 	//
-	if prev := db.RawGet(skv.RawTtlEntry(key)); prev.Status == skv.ReplyOK {
+	if prev := db.RawGet(skv.RawTtlEntry(ttl_key)); prev.Status == skv.ReplyOK {
 		if prev_ttlat := dbutil.BytesToUint64(prev.Bytes()); prev_ttlat != ttlat {
-			batch.Delete(skv.RawTtlQueue(key, prev_ttlat))
+			batch.Delete(skv.RawTtlQueue(ttl_key, prev_ttlat))
 		}
 	}
 
 	//
-	batch.Put(skv.RawTtlQueue(key, ttlat), []byte{})
+	batch.Put(skv.RawTtlQueue(ttl_key, ttlat), []byte{0x00})
 
 	//
-	batch.Put(skv.RawTtlEntry(key), dbutil.Uint64ToBytes(ttlat))
+	batch.Put(skv.RawTtlEntry(ttl_key), dbutil.Uint64ToBytes(ttlat))
 
 	if err := db.ldb.Write(batch, nil); err != nil {
 		return false

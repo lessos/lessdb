@@ -52,6 +52,7 @@ func (db *DB) ttl_worker() {
 						batch.Delete(v.Key[9:])
 					}
 				}
+				// fmt.Println("ttl  delete", dbutil.BytesToUint64(v.Key[1:9]), v.Key[10:])
 
 				batch.Delete(v.Key)
 
